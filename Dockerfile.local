@@ -8,7 +8,16 @@ FROM ubuntu:22.04
 ARG TIMEZONE="UTC"
 ARG CADDY_VERSION="2.10.2"
 
+# Optional: extra CA certificates to trust while building (needed behind a TLS-inspecting proxy such as Zscaler).
+# Pass with:  podman build --build-arg EXTRA_CA_PEM="$(cat corporate-certs.pem)" ...
+# Left empty (the default, e.g. on the server), it changes nothing.
+ARG EXTRA_CA_PEM=""
+
 RUN apt update && \
+    DEBIAN_FRONTEND=noninteractive apt install -qy ca-certificates && \
+    if [ -n "$EXTRA_CA_PEM" ]; then \
+        printf '%s\n' "$EXTRA_CA_PEM" > /usr/local/share/ca-certificates/extra-ca.crt && update-ca-certificates; \
+    fi && \
     DEBIAN_FRONTEND=noninteractive TZ=${TIMEZONE} apt install -qy \
     wget tzdata php-fpm php-mbstring php-sqlite3 php-curl php-gd php-xml \
     php-json php-zip php-intl php-ldap ghostscript \

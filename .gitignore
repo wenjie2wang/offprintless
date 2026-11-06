@@ -6,4 +6,6 @@ data/sessions
 data/supplements
 config/ilibrarian.ini
 .idea
-package.sh
+package.sh.e2e-data-*
+.e2e-config-*
+.e2e-data-*
