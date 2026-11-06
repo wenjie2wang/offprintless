@@ -1,0 +1,9 @@
+.git
+CLAUDE.md
+README*.md
+data/database
+data/cache
+data/pdfs
+data/sessions
+data/supplements
+data/import

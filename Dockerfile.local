@@ -1,0 +1,45 @@
+# Local build of the CURRENT CHECKOUT (e.g. branch ww-project-access) on
+# Ubuntu 22.04 + PHP 8.1. Differences from ./Dockerfile:
+#   - Caddy is downloaded for the image's own CPU architecture (upstream is
+#     hardcoded to amd64 and fails with "exec format error" on arm64/Apple Silicon).
+#   - Uses start.local.sh, which exits if php-fpm or Caddy dies.
+FROM ubuntu:22.04
+
+ARG TIMEZONE="UTC"
+ARG CADDY_VERSION="2.10.2"
+
+RUN apt update && \
+    DEBIAN_FRONTEND=noninteractive TZ=${TIMEZONE} apt install -qy \
+    wget tzdata php-fpm php-mbstring php-sqlite3 php-curl php-gd php-xml \
+    php-json php-zip php-intl php-ldap ghostscript \
+    libreoffice-calc libreoffice-draw libreoffice-impress libreoffice-math libreoffice-writer \
+    poppler-utils tesseract-ocr && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    ARCH="$(dpkg --print-architecture)" && \
+    wget -q "https://github.com/caddyserver/caddy/releases/download/v${CADDY_VERSION}/caddy_${CADDY_VERSION}_linux_${ARCH}.tar.gz" && \
+    tar xzf "caddy_${CADDY_VERSION}_linux_${ARCH}.tar.gz" caddy && \
+    chown root:root caddy && mv caddy /usr/bin/caddy && \
+    rm "caddy_${CADDY_VERSION}_linux_${ARCH}.tar.gz" && \
+    groupadd --system caddy && \
+    useradd --system --gid caddy --create-home --home-dir /var/lib/caddy --shell /usr/sbin/nologin caddy && \
+    usermod -aG www-data caddy
+
+RUN mkdir -p /i-librarian /run/php /etc/caddy /var/log/caddy
+
+COPY app /i-librarian/app/
+COPY bin /i-librarian/bin/
+COPY classes /i-librarian/classes/
+COPY config /i-librarian/config/
+COPY data /i-librarian/data/
+COPY public /i-librarian/public/
+COPY Caddyfile /etc/caddy/Caddyfile
+COPY start.local.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
+
+# www-data is UID/GID 33. The mounted data dir must be writable by it.
+RUN chown -R www-data:www-data /i-librarian/data/ && chown -R caddy:caddy /var/log/caddy
+
+EXPOSE 80
+CMD ["/usr/local/bin/start.sh"]
+STOPSIGNAL SIGQUIT
