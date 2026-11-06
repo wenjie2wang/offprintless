@@ -331,6 +331,9 @@ SQL;
             throw new Exception('this item does not exist', 404);
         }
 
+        // Access model: this writes into the item, so it needs editor rights.
+        $this->requireItemRole($item_id, 'editor');
+
         if ($this->isPdf($item_id) === false) {
 
             return;
@@ -822,6 +825,10 @@ EOT;
      */
     protected function _logPage($item_id, $page): void {
 
+        // Access model: only log reading of items the user can see (also keeps the log free of foreign ids).
+        $this->requireItemRole((int) $item_id, 'viewer');
+
+
         // Log.
         $this->logger = $this->di->get('Logger');
         $this->logger->logPage($this->user_id, $item_id, $page);
@@ -832,6 +839,9 @@ EOT;
      * @throws Exception
      */
     protected function _pdfDownloaded($item_id): void {
+
+        $this->requireItemRole((int) $item_id, 'viewer');
+
 
         // Log.
         $this->logger = $this->di->get('Logger');
@@ -1065,6 +1075,10 @@ EOT;
      */
     protected function _saveOcrText(int $item_id, string $text): void {
 
+        // Access model: OCR text is written into the item, so it needs editor rights.
+        $this->requireItemRole($item_id, 'editor');
+
+
         // Text.
         $text = trim($text, " \f\t\n\r\0\x0B");
 
@@ -1098,6 +1112,10 @@ EOT;
      */
     protected function _saveOcrBoxes(int $item_id, string $boxes): void {
 
+        // Access model: as above.
+        $this->requireItemRole($item_id, 'editor');
+
+
         $pdfpath = $this->idToPdfPath($item_id);
         $this->pdf_object = $this->di->get('Pdf', $pdfpath);
 
@@ -1122,6 +1140,9 @@ EOT;
 
             throw new Exception('this item does not exist', 404);
         }
+
+        // Access model: this writes into the item, so it needs editor rights.
+        $this->requireItemRole($item_id, 'editor');
 
         // Does PDF exist?
         if ($this->isPdf($item_id) === false) {

@@ -69,7 +69,8 @@ class ItemController extends AppController {
 
         // Authorization.
         $this->authorization->signedId(true);
-        $this->authorization->permissions('U');
+        // Access model: the project role is enforced in the model, so invited-only users may edit where they are editors.
+        $this->authorization->permissions('G');
 
         $model = new ItemModel($this->di);
         $model->delete($this->post['id']);
@@ -112,7 +113,8 @@ class ItemController extends AppController {
 
         // Authorization.
         $this->authorization->signedId(true);
-        $this->authorization->permissions('U');
+        // Access model: the project role is enforced in the model, so invited-only users may edit where they are editors.
+        $this->authorization->permissions('G');
 
         if (isset($this->post['repository'])) {
 
@@ -246,7 +248,8 @@ class ItemController extends AppController {
 
         // Authorization.
         $this->authorization->signedId(true);
-        $this->authorization->permissions('U');
+        // Access model: the project role is enforced in the model, so invited-only users may edit where they are editors.
+        $this->authorization->permissions('G');
 
         // Update Bibtex ID.
         $model = new ItemModel($this->di);

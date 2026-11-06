@@ -1315,12 +1315,6 @@ SQL;
      */
     protected function _delete($item_ids): void {
 
-        // Only admins, and users can do this.
-        if ($this->permissions !== 'A' && $this->permissions !== 'U') {
-
-            return;
-        }
-
         // Cached assets.
         $this->cache = $this->di->getShared('FileCache');
 

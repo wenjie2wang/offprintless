@@ -49,8 +49,7 @@ expectOk('bob can read his own item 102',                 fn() => $app->model('I
 echo "--- writing without edit rights ---\n";
 $as($carolH, 'G');
 expectOk('carol (viewer) can read item 101',              fn() => $app->model('ItemModel')->get(101));
-// A 'G' user's delete is a silent no-op upstream; what matters is that the item survives.
-$app->model('ItemModel')->delete(101);
+expectThrows('carol (viewer) cannot delete item 101', fn() => $app->model('ItemModel')->delete(101), 403);
 expectThrows('carol (viewer) cannot save a tag on 101',   fn() => $app->model('TagsModel')->saveItemTags(101, []), 403);
 // Private PDF notes belong to the reader, so a viewer may add their own.
 expectOk('carol (viewer) can keep her own private pdf note', fn() => $app->model('PdfModel')->saveNote(101, 'mine', 1, 1, 1));
@@ -89,6 +88,25 @@ $as($bobH, 'U');
 expectOk('bob is told the DOI does not exist (it is in a project he cannot see)', function () use ($probe) { if ($probe() !== 'N') { throw new Exception('leaked: ' . $probe()); } });
 $as($aliceH, 'U');
 expectOk('alice is told it exists', function () use ($probe) { if ($probe() !== 'Y') { throw new Exception('got ' . $probe()); } });
+
+echo "--- OCR writes and reading logs ---\n";
+$as($bobH, 'U');
+expectThrows('bob (no access) cannot write OCR text into item 101', fn() => $app->model('PdfModel')->saveOcrText(101, 'injected text'), 404);
+expectThrows('bob cannot log reading of item 101',                fn() => $app->model('PdfModel')->logPage(101, 1), 404);
+$as($carolH, 'G');
+expectThrows('carol (viewer) cannot write OCR text into item 101', fn() => $app->model('PdfModel')->saveOcrText(101, 'injected text'), 403);
+expectOk('carol (viewer) can log reading item 101',               fn() => $app->model('PdfModel')->logPage(101, 1));
+
+echo "--- an invited-only (G) user can work as an editor, and only where invited ---\n";
+$app->sql("UPDATE projects_users SET role='editor' WHERE project_id=10 AND user_id=?", [$carolId]);
+$as($carolH, 'G');
+expectOk('carol (G, editor of project 10) can edit item 101',       fn() => $edit(101, 'edited by carol'));
+expectOk('carol (G, editor) can tag item 101',                      fn() => $app->model('TagsModel')->saveItemTags(101, []));
+$app->sql("INSERT INTO items (id, title, private) VALUES (103, 'carol disposable', 'N')");
+$app->sql("INSERT INTO projects_items (project_id, item_id) VALUES (10, 103)");
+expectOk('carol (G, editor) can delete an item in project 10',      fn() => $app->model('ItemModel')->delete(103));
+expectOk('and it is really gone', function () use ($app) { if (count($app->sql('SELECT id FROM items WHERE id=103')) !== 0) { throw new Exception('still there'); } });
+expectThrows('carol (G) still cannot touch bob item 102',           fn() => $edit(102, 'nope'), 404);
 
 echo "--- the item rows survived ---\n";
 expectOk('item 101 still exists', function () use ($app) {

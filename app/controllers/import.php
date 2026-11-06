@@ -33,7 +33,8 @@ class ImportController extends AppController {
 
         // Authorization.
         $this->authorization->signedId(true);
-        $this->authorization->permissions('U');
+        // Access model: the project role is enforced in the model, so invited-only users may edit where they are editors.
+        $this->authorization->permissions('G');
     }
 
     /**

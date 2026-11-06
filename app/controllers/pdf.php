@@ -149,7 +149,8 @@ class PdfController extends AppController {
 
         // Authorization.
         $this->authorization->signedId(true);
-        $this->authorization->permissions('U');
+        // Access model: the project role is enforced in the model, so invited-only users may edit where they are editors.
+        $this->authorization->permissions('G');
 
         if (!isset($this->get['id'])) {
 
@@ -183,7 +184,8 @@ class PdfController extends AppController {
 
         // Authorization.
         $this->authorization->signedId(true);
-        $this->authorization->permissions('U');
+        // Access model: the project role is enforced in the model, so invited-only users may edit where they are editors.
+        $this->authorization->permissions('G');
 
         // Check id.
         if (empty($this->post['id'])) {
@@ -366,7 +368,8 @@ class PdfController extends AppController {
 
         // Authorization.
         $this->authorization->signedId(true);
-        $this->authorization->permissions('U');
+        // Access model: the project role is enforced in the model, so invited-only users may edit where they are editors.
+        $this->authorization->permissions('G');
 
         // Check id.
         // Validate id.
@@ -406,7 +409,8 @@ class PdfController extends AppController {
 
         // Authorization.
         $this->authorization->signedId(true);
-        $this->authorization->permissions('U');
+        // Access model: the project role is enforced in the model, so invited-only users may edit where they are editors.
+        $this->authorization->permissions('G');
 
         // Validate id.
         if (empty($this->post['id'])) {
@@ -446,7 +450,8 @@ class PdfController extends AppController {
 
         // Authorization.
         $this->authorization->signedId(true);
-        $this->authorization->permissions('U');
+        // Access model: the project role is enforced in the model, so invited-only users may edit where they are editors.
+        $this->authorization->permissions('G');
 
         // Validate id.
         if (empty($this->post['id'])) {

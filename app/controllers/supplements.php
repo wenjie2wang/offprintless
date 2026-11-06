@@ -38,7 +38,8 @@ class SupplementsController extends AppController {
     public function mainAction(): string {
 
         // Authorization.
-        $this->authorization->permissions('U');
+        // Access model: the project role is enforced in the model, so invited-only users may edit where they are editors.
+        $this->authorization->permissions('G');
 
         // Check id.
         if (isset($this->get['id']) === false) {
@@ -65,7 +66,8 @@ class SupplementsController extends AppController {
     public function saveAction(): string {
 
         // Authorization.
-        $this->authorization->permissions('U');
+        // Access model: the project role is enforced in the model, so invited-only users may edit where they are editors.
+        $this->authorization->permissions('G');
 
         // Check id.
         if (isset($this->post['id']) === false) {
@@ -129,7 +131,8 @@ class SupplementsController extends AppController {
     public function renameAction(): string {
 
         // Authorization.
-        $this->authorization->permissions('U');
+        // Access model: the project role is enforced in the model, so invited-only users may edit where they are editors.
+        $this->authorization->permissions('G');
 
         // Check id.
         if (isset($this->post['id']) === false) {
@@ -174,7 +177,8 @@ class SupplementsController extends AppController {
     public function deleteAction(): string {
 
         // Authorization.
-        $this->authorization->permissions('U');
+        // Access model: the project role is enforced in the model, so invited-only users may edit where they are editors.
+        $this->authorization->permissions('G');
 
         // Check id.
         if (isset($this->post['id']) === false) {
