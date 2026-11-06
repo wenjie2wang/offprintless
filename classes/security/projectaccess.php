@@ -145,6 +145,17 @@ SQL;
     }
 
     /**
+     * Same as visibleItemsSql(), with the user id inlined as an integer literal, so it can be
+     * dropped into queries whose parameter order must not change. Safe: the id is cast to int.
+     */
+    public function visibleItemsInline(int $user_id, string $permissions): string {
+
+        [$sql, $columns] = $this->visibleItemsSql($user_id, $permissions);
+
+        return $columns === [] ? $sql : str_replace('?', (string) (int) $columns[0], $sql);
+    }
+
+    /**
      * May the user create projects?
      */
     public static function canCreateProjects(string $permissions): bool {

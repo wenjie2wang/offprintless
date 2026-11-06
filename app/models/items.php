@@ -70,9 +70,13 @@ class ItemsModel extends AppModel {
 
             case 'library':
 
+                // Access model: the library is the items in projects the user can see.
+                $visible = $this->visibleItems();
+
                 $sql = <<<EOT
 SELECT id as item_id
     FROM items
+    WHERE id IN ({$visible})
     ORDER BY {$order}
     LIMIT ? OFFSET ?
 EOT;
@@ -213,10 +217,13 @@ EOT;
 
             case 'library':
 
+                // The global stats counter would reveal how many items other users have.
+                $visible = $this->visibleItems();
+
                 $sql = <<<EOT
-SELECT total_count
-    FROM stats
-    WHERE table_name = 'items';
+SELECT count(*)
+    FROM items
+    WHERE id IN ({$visible})
 EOT;
 
                 $this->db_main->run($sql);
@@ -984,6 +991,8 @@ EOT;
         $columns = [];
         $join_collection = '';
         $where_collection = '';
+        // Access model: only items in projects the user can see (admins see all).
+        $where_visible = 'AND ind_items.id IN (' . $this->visibleItems() . ')';
         $extra_characters = "''\"“”＂«‹›»-˗‐‑‒–−➖Ⲻ﹘!ǃⵑ！?.,;;:：#$&()/<>=@^{}|";
 
         // Modify query based on boolean type.
@@ -1091,6 +1100,7 @@ SELECT
     {$join_collection}
     WHERE ({$placeholder})
     {$where_collection}
+    {$where_visible}
     ORDER BY {$order}
     LIMIT ?
 EOT;
@@ -1102,7 +1112,7 @@ EOT;
 
         $key = $cache->key(
             __METHOD__
-            . serialize([$search, $collection, $orderby, $project_id])
+            . serialize([$search, $collection, $orderby, $project_id, $this->visibleItems()])
         );
 
         // Debug.
@@ -1206,6 +1216,8 @@ SQL;
         $columns_count = [];
         $join_collection = '';
         $where_collection = '';
+        // Access model: only items in projects the user can see (admins see all).
+        $where_visible = 'AND items.id IN (' . $this->visibleItems() . ')';
 
         // Modify query based on boolean type.
         switch ($search['search_boolean'][0]) {
@@ -1275,6 +1287,7 @@ SELECT
     {$join_collection}
     WHERE ({$placeholder})
     {$where_collection}
+    {$where_visible}
     ORDER BY {$order}
     LIMIT ? OFFSET ?
 EOT;
@@ -1330,6 +1343,7 @@ SELECT
     {$join_collection}
     WHERE {$placeholder}
     {$where_collection}
+    {$where_visible}
 EOT;
 
         if ($collection === 'clipboard') {
@@ -1387,6 +1401,8 @@ EOT;
         $columns_count = [];
         $join_collection = '';
         $where_collection = '';
+        // Access model: only items in projects the user can see (admins see all).
+        $where_visible = 'AND items.id IN (' . $this->visibleItems() . ')';
 
         // Modify query based on boolean type.
         switch ($search['search_boolean'][0]) {
@@ -1456,6 +1472,7 @@ SELECT
     {$join_collection}
     WHERE ({$placeholder})
     {$where_collection}
+    {$where_visible}
     ORDER BY {$order}
     LIMIT ? OFFSET ?
 EOT;
@@ -1511,6 +1528,7 @@ SELECT
     {$join_collection}
     WHERE {$placeholder}
     {$where_collection}
+    {$where_visible}
 EOT;
 
         if ($collection === 'clipboard') {
@@ -1594,6 +1612,8 @@ EOT;
         $columns = [];
         $join_collection = '';
         $where_collection = '';
+        // Access model: only items in projects the user can see (admins see all).
+        $where_visible = 'AND ind_items.id IN (' . $this->visibleItems() . ')';
         $extra_characters = "''\"“”＂«‹›»-˗‐‑‒–−➖Ⲻ﹘!ǃⵑ！?.,;;:：#$&()/<>=@^{}|";
 
         foreach ($search['search_query'] as $key => $search_query) {
@@ -1782,6 +1802,7 @@ SELECT
     {$tag_join}
     WHERE ({$placeholder})
     {$where_collection}
+    {$where_visible}
     {$tag_where}
     ORDER BY {$order}
     LIMIT ?
@@ -1794,7 +1815,7 @@ EOT;
 
         $key = $cache->key(
             __METHOD__
-            . serialize([$search, $collection, $orderby, $project_id])
+            . serialize([$search, $collection, $orderby, $project_id, $this->visibleItems()])
         );
 
         // Debug.
@@ -1890,6 +1911,8 @@ SQL;
 
         $join_collection = '';
         $where_collection = '';
+        // Access model: only items in projects the user can see (admins see all).
+        $where_visible = 'AND items.id IN (' . $this->visibleItems() . ')';
 
         // SQL ORDER BY.
         $order = $this->orderByColumn($orderby);
@@ -1940,6 +1963,7 @@ SELECT
     {$join_collection}
     WHERE id IN ({$placeholders})
     {$where_collection}
+    {$where_visible}
     ORDER BY {$order}
     LIMIT ? OFFSET ?
 EOT;
@@ -2000,6 +2024,7 @@ SELECT count(*)
     {$join_collection}
     WHERE id IN ({$placeholders})
     {$where_collection}
+    {$where_visible}
 EOT;
 
         $columns_count = $item_ids;
@@ -2037,6 +2062,8 @@ EOT;
 
         $join_collection = '';
         $where_collection = '';
+        // Access model: only items in projects the user can see (admins see all).
+        $where_visible = 'AND uids.item_id IN (' . $this->visibleItems() . ')';
         $normalized_uids = [];
         $placeholder_arr = [];
 
@@ -2111,6 +2138,7 @@ SELECT DISTINCT uids.item_id
     $join_collection
     WHERE $placeholders
     $where_collection
+    $where_visible
     ORDER BY uids.item_id DESC
     LIMIT ? OFFSET ?
 EOT;
@@ -2171,6 +2199,7 @@ SELECT count(DISTINCT uids.item_id)
     $join_collection
     WHERE $placeholders
     $where_collection
+    $where_visible
 EOT;
 
         $columns_count = $normalized_uids;

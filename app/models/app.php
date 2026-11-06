@@ -5,6 +5,7 @@ namespace LibrarianApp;
 use Exception;
 use Librarian\Container\DependencyInjector;
 use Librarian\Mvc\Model;
+use Librarian\Security\ProjectAccess;
 use Librarian\Security\Session;
 
 /**
@@ -68,13 +69,72 @@ SQL;
         $this->permissions = $row['permissions'];
     }
 
+    private ?ProjectAccess $project_access = null;
+
+    protected function access(): ProjectAccess {
+
+        return $this->project_access ??= new ProjectAccess($this->db_main);
+    }
+
     /**
-     * Verify if allowed to see project.
+     * SQL subquery of item ids the current user may see. Use as `<col> IN (<this>)`.
+     */
+    protected function visibleItems(): string {
+
+        return $this->access()->visibleItemsInline((int) $this->user_id, $this->permissions);
+    }
+
+    /**
+     * Role over a project: owner|editor|viewer, or null if it is invisible to the user.
+     */
+    protected function projectRole(int $project_id): ?string {
+
+        return $this->access()->projectRole((int) $this->user_id, $this->permissions, $project_id);
+    }
+
+    /**
+     * Role over an item through any project holding it, or null if the user cannot see it.
+     */
+    protected function itemRole(int $item_id): ?string {
+
+        return $this->access()->itemRole((int) $this->user_id, $this->permissions, $item_id);
+    }
+
+    /**
+     * Throw 403 unless the user has at least $needed over the item. Hides existence as 404.
+     *
+     * @throws Exception
+     */
+    protected function requireItemRole(int $item_id, string $needed = 'viewer'): void {
+
+        $role = $this->itemRole($item_id);
+
+        if ($role === null) {
+
+            throw new Exception('item not found', 404);
+        }
+
+        if (ProjectAccess::atLeast($role, $needed) === false) {
+
+            throw new Exception('you do not have permission for this item', 403);
+        }
+    }
+
+    /**
+     * Verify if allowed to see project (owner, editor, viewer, a public project, or admin).
      *
      * @param int $project_id
      * @return bool
      */
     protected function verifyProject(int $project_id): bool {
+
+        return $this->projectRole($project_id) !== null;
+    }
+
+    /**
+     * Previous membership-only check, kept for callers that need strict membership.
+     */
+    protected function isProjectMember(int $project_id): bool {
 
         $sql = <<<EOT
 SELECT count(*)
