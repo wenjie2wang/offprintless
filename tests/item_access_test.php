@@ -68,6 +68,28 @@ expectOk('item 101 survives the rejected batch', function () use ($app) {
 $app->sql("UPDATE projects_users SET role='editor' WHERE project_id=11 AND user_id=?", [$aliceId]);
 expectOk('alice (editor) can delete item 102', fn() => $app->model('ItemModel')->delete(102));
 
+echo "--- editing an item by id (ItemModel::update) ---\n";
+$orig = fn() => $app->sql('SELECT title FROM items WHERE id = 101')[0]['title'];
+$edit = fn(int $id, string $t) => $app->model('ItemModel')->update(['id' => $id, 'title' => $t, 'reference_type' => 'article']);
+
+$as($bobH, 'U');   // no access at all to item 101
+expectThrows('bob (no access) cannot overwrite alice item 101', fn() => $edit(101, 'HIJACKED-BY-BOB'), 404);
+$as($carolH, 'G'); // viewer of project 10
+expectThrows('carol (viewer) cannot edit item 101', fn() => $edit(101, 'HIJACKED-BY-CAROL'), 403);
+expectOk('title of 101 unchanged', function () use ($orig) { if ($orig() !== 'alice secret') { throw new Exception('title is now: ' . $orig()); } });
+expectThrows('carol (viewer) cannot regenerate the BibTeX id of 101', fn() => $app->model('ItemModel')->updateBibtexId(101), 403);
+$as($aliceH, 'U');
+expectOk('alice (owner) can edit her own item', fn() => $edit(101, 'alice secret v2'));
+expectOk('and the edit was saved', function () use ($orig) { if ($orig() !== 'alice secret v2') { throw new Exception('not saved: ' . $orig()); } });
+
+echo "--- duplicate check must not reveal other projects' DOIs ---\n";
+$app->sql("INSERT INTO uids (item_id, uid_type, uid) VALUES (101, 'DOI', '10.1/alice-only')");
+$probe = fn() => $app->model('ItemModel')->uidsExist([['uid_types' => ['DOI'], 'uids' => ['10.1/alice-only']]])[0]['exists'];
+$as($bobH, 'U');
+expectOk('bob is told the DOI does not exist (it is in a project he cannot see)', function () use ($probe) { if ($probe() !== 'N') { throw new Exception('leaked: ' . $probe()); } });
+$as($aliceH, 'U');
+expectOk('alice is told it exists', function () use ($probe) { if ($probe() !== 'Y') { throw new Exception('got ' . $probe()); } });
+
 echo "--- the item rows survived ---\n";
 expectOk('item 101 still exists', function () use ($app) {
     if (count($app->sql('SELECT id FROM items WHERE id = 101')) !== 1) { throw new Exception('deleted!'); }

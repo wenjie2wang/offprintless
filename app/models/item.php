@@ -772,6 +772,14 @@ EOT;
             throw new Exception('item title is required', 400);
         }
 
+        // Access model: editing needs editor rights in a project that holds the item. Checked before any write.
+        if (isset($item['id']) === false) {
+
+            throw new Exception('item id is required', 400);
+        }
+
+        $this->requireItemRole((int) $item['id'], 'editor');
+
         $this->scalar_utils = $this->di->getShared('ScalarUtils');
 
         // Publication titles.
@@ -1488,7 +1496,7 @@ EOT;
         $sql = <<<SQL
 SELECT count(*)
     FROM uids
-    WHERE uid = ? AND uid_type = ?
+    WHERE uid = ? AND uid_type = ? AND item_id IN ({$this->visibleItems()})
     LIMIT 1
 SQL;
 
@@ -1532,6 +1540,9 @@ SQL;
      * @throws Exception
      */
     protected function _updateBibtexId(int $item_id): void {
+
+        // Access model: this rewrites the item, so it needs editor rights.
+        $this->requireItemRole($item_id, 'editor');
 
         // Get id format.
         $setting = $this->getGlobalSetting('custom_bibtex');
