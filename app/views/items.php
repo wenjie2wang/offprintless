@@ -2301,7 +2301,8 @@ SCRIPT;
         $el = null;
 
         // Only admins, and users can delete.
-        if ($this->session->data('permissions') === 'A' || $this->session->data('permissions') === 'U') {
+        // Access model: the server checks the project role on every action, so the controls are shown to all.
+        if (true) {
 
             $inputs .= "<div class=\"mt-3 mb-2 cursor-pointer text-danger\" data-toggle=\"collapse\" data-target=\"#delete-all\">$arrow<b>{$this->lang->t9n('Delete all')}</b></div>";
 

@@ -206,6 +206,11 @@ class ProjectsView extends TextView {
 
                 $date = $this->temporal->toUserTime($project['added_time']);
 
+                // Access model: owners (and admins) manage a project; the Public project can never be removed.
+                $can_manage = ($project['role'] ?? '') === 'owner';
+                $is_public = ($project['is_public'] ?? 'N') === 'Y';
+                $role_label = $this->lang->t9n(ucfirst($project['role'] ?? 'viewer'));
+
                 /** @var Bootstrap\Button $el */
                 $el = $this->di->get('Button');
 
@@ -216,7 +221,7 @@ class ProjectsView extends TextView {
                 $el->style('min-width: 6rem');
                 $el->html($this->lang->t9n('Inactivate'));
 
-                if ($this->session->data('user_id') !== $project['id_hash']) {
+                if ($can_manage === false || $is_public) {
 
                     $el->context('outline-secondary');
                     $el->disabled('disabled');
@@ -236,7 +241,7 @@ class ProjectsView extends TextView {
                 $el->componentSize('small');
                 $el->html($this->lang->t9n('Leave'));
 
-                if ($this->session->data('user_id') === $project['id_hash'] || $project['is_restricted'] === 'Y') {
+                if ($can_manage || $is_public || $project['is_restricted'] === 'Y') {
 
                     $el->context('outline-secondary');
                     $el->disabled('disabled');
@@ -254,7 +259,7 @@ class ProjectsView extends TextView {
                 $el->componentSize('small');
                 $el->html($this->lang->t9n('Edit'));
 
-                if ($this->session->data('user_id') !== $project['id_hash']) {
+                if ($can_manage === false) {
 
                     $el->context('outline-secondary');
                     $el->disabled('disabled');
@@ -281,7 +286,7 @@ class ProjectsView extends TextView {
                 $el->componentSize('small');
                 $el->html($this->lang->t9n('Delete'));
 
-                if ($this->session->data('user_id') !== $project['id_hash']) {
+                if ($can_manage === false || $is_public) {
 
                     $el->context('outline-secondary');
                     $el->disabled('disabled');
@@ -295,6 +300,7 @@ class ProjectsView extends TextView {
                     <div class="mb-2 active-project-container">
                         <h5><a class="active-project" href="{$IL_BASE_URL}index.php/project#project/browse?id={$project['id']}">{$project['project']}</a></h5>
                         <b>{$this->lang->t9n('Owner')}:</b> {$project['name']} &middot;
+                        <b>{$this->lang->t9n('Your role')}:</b> {$role_label} &middot;
                         <b>{$this->lang->t9n('Created')}:</b> $date <br>
                         $inactivate $leave $edit $delete
                     </div>

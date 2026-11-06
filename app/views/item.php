@@ -167,7 +167,8 @@ class ItemView extends TextView {
             'attrs' => 'class="add-id-link"'
         ];
 
-        if ($this->session->data('permissions') === 'A' || $this->session->data('permissions') === 'U') {
+        // Access model: the server checks the project role on every action, so the controls are shown to all.
+        if (true) {
 
             $menu_arr[] = [
                 'label' => "{$pdf_icon}Pdf",
@@ -235,7 +236,8 @@ class ItemView extends TextView {
             'attrs' => 'class="add-id-link"'
         ];
 
-        if ($this->session->data('permissions') === 'A' || $this->session->data('permissions') === 'U') {
+        // Access model: the server checks the project role on every action, so the controls are shown to all.
+        if (true) {
 
             $menu_arr[] = [
                 'label' => "{$edit_icon}{$this->lang->t9n('Edit')}",

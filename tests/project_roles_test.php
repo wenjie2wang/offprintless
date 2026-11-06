@@ -119,5 +119,17 @@ check('...and nothing half-saved was left behind', $app->sql("SELECT count(*) c 
 $as($carolH, 'G'); // invited-only, not a member of Public with write rights
 check('invited-only user cannot add items to Public', code(fn() => $save([])), 403);
 
+echo "--- the Public project must be listed for everyone ---\n";
+$listed = function () use ($app) {
+    $r = $app->model('ProjectModel')->list();
+    $names = [];
+    foreach (['active_projects', 'inactive_projects', 'open_projects'] as $k) { foreach ($r[$k] as $p) { $names[] = $p['project']; } }
+    return $names;
+};
+foreach ([['alice', $aliceH, 'U'], ['carol (G)', $carolH, 'G'], ['admin', $adminH, 'A']] as [$who, $h, $perm]) {
+    $as($h, $perm);
+    check("Public is listed for $who", in_array('Public', $listed(), true), true);
+}
+
 echo $fails === 0 ? "\nALL PASSED\n" : "\n$fails FAILED\n";
 exit($fails === 0 ? 0 : 1);

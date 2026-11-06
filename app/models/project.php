@@ -190,25 +190,31 @@ EOT;
 
         $output['users'] = $this->db_main->getResultRows();
 
-        // Get user's projects.
+        // Get user's projects: those they are a member of, plus the Public project for everyone. Admins also
+        // see every project (they control all of them). The role column tells the view what they may do.
+        $everything = $this->permissions === 'A' ? 'OR 1 = 1' : '';
+
         $sql = <<<EOT
 SELECT
     projects.id,
-    users.id_hash,
-    ifnull(trim(users.first_name || ' ' || users.last_name), users.username) as name,
+    owner.id_hash,
+    coalesce(nullif(trim(owner.first_name || ' ' || owner.last_name), ''), owner.username, '') as name,
     projects.project,
     projects.is_active,
     projects.is_restricted,
-    projects.added_time
+    projects.is_public,
+    projects.added_time,
+    CASE WHEN ? = 'A' THEN 'owner' ELSE ifnull(projects_users.role, 'viewer') END AS role
     FROM projects
-    INNER JOIN users ON projects.user_id = users.id
-    INNER JOIN projects_users on projects.id = projects_users.project_id
-    WHERE projects_users.user_id = ?
+    LEFT JOIN users AS owner ON projects.user_id = owner.id
+    LEFT JOIN projects_users ON projects.id = projects_users.project_id AND projects_users.user_id = ?
+    WHERE projects_users.user_id IS NOT NULL OR projects.is_public = 'Y' {$everything}
     GROUP BY projects.id, projects.project
-    ORDER BY projects.project COLLATE utf8Collation
+    ORDER BY projects.is_public DESC, projects.project COLLATE utf8Collation
 EOT;
 
         $columns = [
+            $this->permissions,
             $this->user_id
         ];
 
@@ -237,6 +243,7 @@ SELECT
     INNER JOIN users ON projects.user_id = users.id
     WHERE
         projects.is_restricted = 'N' AND
+        projects.is_public = 'N' AND
         projects.is_active = 'Y' AND
         projects.user_id != ?
 EXCEPT

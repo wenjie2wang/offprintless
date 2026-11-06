@@ -391,7 +391,7 @@ HTML
          * Import.
          */
 
-        if ($this->session->data('permissions') === 'A' || $this->session->data('permissions') === 'U') {
+        if (true) { // Access model: server enforces the project role; invited-only editors may import into their projects.
 
             $import = [
                 [
