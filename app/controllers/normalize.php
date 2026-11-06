@@ -15,7 +15,8 @@ class NormalizeController extends AppController {
 
         // Authorization.
         $this->authorization->signedId(true);
-        $this->authorization->permissions('U');
+        // Access model: normalizing rewrites shared names across ALL projects, so it is admin-only.
+        $this->authorization->permissions('A');
     }
 
     /**

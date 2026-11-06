@@ -26,6 +26,53 @@ use PDO;
 class ProjectModel extends AppModel {
 
     /**
+     * Users this user may see in the invite lists. Access model: users are invisible to each other unless
+     * they share a project, so non-admins get only their co-members; admins get everyone. Everyone else
+     * is invited by typing the exact username.
+     *
+     * @param bool $with_status_filter Only active accounts.
+     * @return string SQL fragment for a "users.id IN (...)" condition, with the user id inlined as an int.
+     */
+    private function knownUsersCondition(): string {
+
+        if ($this->permissions === 'A') {
+
+            return '1 = 1';
+        }
+
+        $me = (int) $this->user_id;
+
+        return "users.id IN (
+            SELECT pu2.user_id FROM projects_users pu1
+            INNER JOIN projects_users pu2 ON pu2.project_id = pu1.project_id
+            INNER JOIN projects p ON p.id = pu1.project_id AND p.is_public = 'N'
+            WHERE pu1.user_id = {$me})";
+    }
+
+    /**
+     * Turn typed usernames (separated by newline, comma or space) into id_hashes. Unknown names are ignored
+     * silently so the form cannot be used to test which usernames exist.
+     */
+    private function usernamesToHashes($typed): array {
+
+        $names = preg_split('/[\s,;]+/', trim((string) $typed), -1, PREG_SPLIT_NO_EMPTY);
+        $hashes = [];
+
+        foreach (array_slice(array_unique($names), 0, 100) as $name) {
+
+            $this->db_main->run("SELECT id_hash FROM users WHERE username = ? AND status = 'A'", [$name]);
+            $hash = $this->db_main->getResult();
+
+            if (is_string($hash)) {
+
+                $hashes[] = $hash;
+            }
+        }
+
+        return $hashes;
+    }
+
+    /**
      * Get project data.
      *
      * @param int $project_id
@@ -87,7 +134,7 @@ EOT;
         $sql = <<<EOT
 SELECT ifnull(trim(first_name || ' ' || last_name), username) as name, id_hash
     FROM users
-    WHERE id != ?
+    WHERE id != ? AND {$this->knownUsersCondition()}
     ORDER BY name COLLATE utf8Collation
 EOT;
 
@@ -131,7 +178,7 @@ EOT;
         $sql = <<<EOT
 SELECT ifnull(trim(first_name || ' ' || last_name), username) as name, id_hash
     FROM users
-    WHERE id != ? AND status = 'A'
+    WHERE id != ? AND status = 'A' AND {$this->knownUsersCondition()}
     ORDER BY name COLLATE utf8Collation
 EOT;
 
@@ -261,7 +308,9 @@ EOT;
         // Invited users. Never trust a posted role of 'owner'; the owner is the creator.
         $role = ($project['role'] ?? 'editor') === 'viewer' ? 'viewer' : 'editor';
 
-        foreach ((array) ($project['users'] ?? []) as $id_hash) {
+        $invited = array_merge((array) ($project['users'] ?? []), $this->usernamesToHashes($project['invite'] ?? ''));
+
+        foreach (array_unique($invited) as $id_hash) {
 
             $this->db_main->run(
                 'INSERT OR IGNORE INTO projects_users (project_id, user_id, role)
@@ -305,7 +354,10 @@ EOT;
 
         // Members. Merge, do not wipe: keep existing roles and the owner, add new people, remove unticked ones.
         $role = ($project['role'] ?? 'editor') === 'viewer' ? 'viewer' : 'editor';
-        $wanted = array_values(array_unique((array) ($project['users'] ?? [])));
+        $wanted = array_values(array_unique(array_merge(
+            (array) ($project['users'] ?? []),
+            $this->usernamesToHashes($project['invite'] ?? '')
+        )));
 
         $this->db_main->run(
             'SELECT users.id_hash FROM projects_users INNER JOIN users ON users.id = projects_users.user_id

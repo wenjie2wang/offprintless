@@ -136,6 +136,31 @@ class ProjectsView extends TextView {
             $el = null;
         }
 
+
+        // Access model: invite by exact username (users are otherwise invisible to each other), and the role they get.
+        /** @var Bootstrap\Input $el */
+        $el = $this->di->get('Input');
+
+        $el->name('invite');
+        $el->label($this->lang->t9n('Invite by username'));
+        $el->hint($this->lang->t9n('Usernames separated by spaces or commas.'));
+        $invite_box = $el->render();
+
+        $el = null;
+
+        /** @var Bootstrap\Select $el */
+        $el = $this->di->get('Select');
+
+        $el->name('role');
+        $el->label($this->lang->t9n('Role of invited users'));
+        $el->option($this->lang->t9n('Editor: can add, change and remove items'), 'editor', true);
+        $el->option($this->lang->t9n('Viewer: read-only'), 'viewer', false);
+        $role_select = $el->render();
+
+        $el = null;
+
+        $users_card .= $invite_box . $role_select;
+
         /** @var Bootstrap\Button $el */
         $el = $this->di->get('Button');
 

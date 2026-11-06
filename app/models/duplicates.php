@@ -46,6 +46,7 @@ INSERT INTO temp_titles
     (id, title, sound, file_hash)
     SELECT items.id, items.title, metaphone(deaccent(items.title)), items.file_hash
         FROM items
+        WHERE items.id IN ({$this->visibleItems()})
 SQL;
 
         $this->db_main->run($sql);
@@ -85,12 +86,14 @@ SQL;
 WITH cte AS (
     SELECT id, title, count(*)
         FROM items
+        WHERE id IN ({$this->visibleItems()})
         GROUP BY title
         HAVING count(*) > 1
 )
 SELECT items.title, items.id, items.file_hash
     FROM items
     INNER JOIN cte ON cte.title = items.title
+    WHERE items.id IN ({$this->visibleItems()})
     ORDER BY items.title;
 SQL;
 
@@ -112,7 +115,7 @@ SQL;
 
         // Make sure all PDFs have hashes.
 
-        $sql_select_nohash = <<<'SQL'
+        $sql_select_nohash = <<<SQL
 SELECT id
     FROM items
     WHERE file_hash IS NULL
@@ -152,12 +155,14 @@ EOT;
 WITH cte AS (
     SELECT id, file_hash, count(*)
         FROM items
+        WHERE id IN ({$this->visibleItems()})
         GROUP BY file_hash
         HAVING count(*) > 1
 )
 SELECT items.file_hash, items.id, items.title
     FROM items
     INNER JOIN cte ON cte.file_hash = items.file_hash
+    WHERE items.id IN ({$this->visibleItems()})
     ORDER BY items.file_hash;
 SQL;
 
@@ -177,6 +182,12 @@ SQL;
      * @throws Exception
      */
     protected function _merge(array $item_ids, string $id_to_keep): void {
+
+        // Access model: merging rewrites and removes items, so the user needs editor rights on all of them.
+        foreach (array_merge($item_ids, [$id_to_keep]) as $guard_id) {
+
+            $this->requireItemRole((int) $guard_id, 'editor');
+        }
 
         // Merge tags.
         $sql_tag = <<<SQL

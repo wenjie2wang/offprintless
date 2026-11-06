@@ -553,13 +553,18 @@ HTML
                     [
                         'label' => $this->lang->t9n('Manage tags'),
                         'link' => '#tags/manage'
-                    ],
-                    [
-                        'label' => $this->lang->t9n('Normalize data'),
-                        'link' => '#normalize/main'
                     ]
                 ]
             ];
+
+            // Normalizing renames shared authors/titles across every project: admins only.
+            if ($this->session->data('permissions') === 'A') {
+
+                $menu_arr[count($menu_arr) - 1]['submenu'][] = [
+                    'label' => $this->lang->t9n('Normalize data'),
+                    'link' => '#normalize/main'
+                ];
+            }
         }
 
         /*

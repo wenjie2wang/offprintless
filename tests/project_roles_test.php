@@ -75,5 +75,28 @@ check('viewer cannot tag the item', code(fn() => $app->model('ItemsModel')->tag(
 $as($carolH, 'G');
 check('outsider cannot put an item they cannot see on the clipboard', code(fn() => $app->model('ItemsModel')->clipboardAdd([500])), 404);
 
+echo "--- users are invisible to each other; invite by exact username ---\n";
+[$danId, $danH] = $app->addUser('dan', 'U');
+$names = function () use ($app) {
+    $r = $app->model('ProjectModel')->list();
+    return array_column($r['users'], 'name');
+};
+$as($danH, 'U');
+check("dan (no shared project) sees nobody in the invite list", $names(), []);
+
+$as($aliceH, 'U');
+$list = $names();
+check("alice's list has bob (co-member of Items P) but not dan", [in_array('bob', $list), in_array('dan', $list)], [true, false]);
+
+$app->model('ProjectModel')->create(['name' => 'Typed P', 'access' => 'restricted', 'invite' => "dan, nobody-here\nbob", 'role' => 'viewer']);
+$tid = (int) $app->sql("SELECT id FROM projects WHERE project='Typed P'")[0]['id'];
+check('invite by typed username works', [$role($tid, $danId), $role($tid, $bobId)], ['viewer', 'viewer']);
+check('unknown usernames are ignored silently (no error, no row)', (int) $app->sql("SELECT count(*) c FROM projects_users WHERE project_id=?", [$tid])[0]['c'], 3);
+
+$as($danH, 'U');
+check("after being invited, dan sees alice (shared project) in his list", in_array('alice', $names()), true);
+$as($adminH, 'A');
+check("admin sees everyone", count($names()) >= 4, true);
+
 echo $fails === 0 ? "\nALL PASSED\n" : "\n$fails FAILED\n";
 exit($fails === 0 ? 0 : 1);
