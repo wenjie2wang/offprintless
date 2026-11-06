@@ -11,6 +11,7 @@ use Librarian\Import\Ris;
 use Librarian\ItemMeta;
 use Librarian\Media\Pdf;
 use Librarian\Media\ScalarUtils;
+use Librarian\Security\ProjectAccess;
 use PDO;
 
 /**
@@ -657,26 +658,48 @@ EOT;
             $this->db_main->run($clipboard_sql, $columns);
         }
 
-        // Save to projects.
-        if (!empty(isset($item['projects']))) {
+        // Save to projects. Access model: an item lives only in projects, so one with no project would be
+        // invisible to everybody, its creator included. File it in the Public project in that case.
+        $target_projects = empty($item['projects']) ? [] : (array) $item['projects'];
+
+        if ($target_projects === []) {
+
+            $this->db_main->run("SELECT id FROM projects WHERE is_public = 'Y' ORDER BY id LIMIT 1");
+            $public_id = $this->db_main->getResult();
+
+            if ($public_id !== false && $public_id !== null) {
+
+                $target_projects = [(int) $public_id];
+            }
+        }
+
+        if ($target_projects !== []) {
 
             $project_sql = <<<EOT
-INSERT INTO projects_items
+INSERT OR IGNORE INTO projects_items
     (project_id, item_id)
     VALUES(?, ?)
 EOT;
 
-            foreach ($item['projects'] as $id) {
+            foreach ($target_projects as $id) {
 
-                // Authorize project.
-                if ($this->verifyProject($id) === false) {
+                // Authorize project: adding an item needs editor rights, or admin/creator for the Public project.
+                $role = $this->projectRole((int) $id);
+
+                $this->db_main->run("SELECT is_public FROM projects WHERE id = ?", [(int) $id]);
+                $is_public = $this->db_main->getResult() === 'Y';
+
+                $may_add = ProjectAccess::atLeast($role, 'editor')
+                    || ($is_public && ProjectAccess::canCreateProjects($this->permissions));
+
+                if ($may_add === false) {
 
                     $this->db_main->rollBack();
-                    throw new Exception('you are not authorized to access this project', 403);
+                    throw new Exception('you are not authorized to add items to this project', 403);
                 }
 
                 $columns = [
-                    $id,
+                    (int) $id,
                     $last_id
                 ];
 

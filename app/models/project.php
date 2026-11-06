@@ -3,6 +3,7 @@
 namespace LibrarianApp;
 
 use Exception;
+use Librarian\Security\ProjectAccess;
 use PDO;
 
 /**
@@ -37,16 +38,22 @@ class ProjectModel extends AppModel {
 
         // Project data.
         $sql = <<<EOT
-SELECT id, project, is_active, is_restricted
+SELECT id, project, is_active, is_restricted, is_public
     FROM projects
     WHERE
-        id = ? AND user_id = ?
+        id = ?
 EOT;
 
         $columns = [
-            $project_id,
-            $this->user_id
+            $project_id
         ];
+
+        // Access model: only the owner (or an admin) opens the settings form.
+        if (ProjectAccess::atLeast($this->projectRole($project_id), 'owner') === false) {
+
+            $this->db_main->commit();
+            return [];
+        }
 
         $this->db_main->run($sql, $columns);
         $output = $this->db_main->getResultRow();
@@ -215,6 +222,12 @@ EOT;
      */
     protected function _create(array $project): void {
 
+        // Access model: only admins and creators (U) may create projects.
+        if (ProjectAccess::canCreateProjects($this->permissions) === false) {
+
+            throw new Exception('you are not allowed to create projects', 403);
+        }
+
         $sql = <<<EOT
 INSERT INTO projects
     (user_id, project, is_active, is_restricted, added_time)
@@ -239,31 +252,22 @@ EOT;
 
         $project_id = $this->db_main->lastInsertId();
 
-        // Add the project owner to the project users.
-        if (isset($project['users']) === false) {
+        // The creator is the owner.
+        $this->db_main->run(
+            "INSERT INTO projects_users (project_id, user_id, role) VALUES (?, ?, 'owner')",
+            [$project_id, $this->user_id]
+        );
 
-            $project['users'] = [$this->id_hash];
+        // Invited users. Never trust a posted role of 'owner'; the owner is the creator.
+        $role = ($project['role'] ?? 'editor') === 'viewer' ? 'viewer' : 'editor';
 
-        } else {
+        foreach ((array) ($project['users'] ?? []) as $id_hash) {
 
-            $project['users'][] = $this->id_hash;
-        }
-
-        // Add users.
-        $sql = <<<EOT
-INSERT INTO projects_users
-    (project_id, user_id)
-    VALUES(?, (SELECT id FROM users WHERE id_hash = ?))
-EOT;
-
-        foreach ($project['users'] as $id_hash) {
-
-            $columns = [
-                $project_id,
-                $id_hash
-            ];
-
-            $this->db_main->run($sql, $columns);
+            $this->db_main->run(
+                'INSERT OR IGNORE INTO projects_users (project_id, user_id, role)
+                    SELECT ?, id, ? FROM users WHERE id_hash = ? AND id != ?',
+                [$project_id, $role, $id_hash, $this->user_id]
+            );
         }
 
         $this->db_main->commit();
@@ -280,66 +284,53 @@ EOT;
 
         $this->db_main->beginTransaction();
 
-        $sql = <<<EOT
-UPDATE projects
-    SET project = ?, is_restricted = ?
-    WHERE id = ? AND user_id = ?
-EOT;
-
-        $columns = [
-            $project['name'],
-            $project['access'] === 'restricted' ? 'Y' : 'N',
-            $project_id,
-            $this->user_id
-        ];
-
-        $this->db_main->run($sql, $columns);
-
-        $updated = (int) $this->db_main->getPDOStatement()->rowCount();
-
-        if ($updated === 0) {
+        // Access model: only the project owner (or an admin) may change settings and members.
+        if (ProjectAccess::atLeast($this->projectRole($project_id), 'owner') === false) {
 
             $this->db_main->rollBack();
             throw new Exception('project does not exist, or you are not authorized to edit it', 403);
         }
 
-        // Update users.
-        $sql = <<<EOT
-DELETE
-FROM projects_users
-    WHERE project_id = ?
-EOT;
+        // The Public project keeps its name and stays open.
+        $this->db_main->run('SELECT is_public FROM projects WHERE id = ?', [$project_id]);
+        $is_public = $this->db_main->getResult() === 'Y';
 
-        $columns = [
-            $project_id
-        ];
+        if ($is_public === false) {
 
-        $this->db_main->run($sql, $columns);
-
-        // Add the project owner to the project users.
-        if (isset($project['users']) === false) {
-
-            $project['users'] = [$this->id_hash];
-
-        } else {
-
-            $project['users'][] = $this->id_hash;
+            $this->db_main->run(
+                'UPDATE projects SET project = ?, is_restricted = ? WHERE id = ?',
+                [$project['name'], $project['access'] === 'restricted' ? 'Y' : 'N', $project_id]
+            );
         }
 
-        $sql = <<<EOT
-INSERT INTO projects_users
-    (project_id, user_id)
-    VALUES(?, (SELECT id FROM users WHERE id_hash = ?))
-EOT;
+        // Members. Merge, do not wipe: keep existing roles and the owner, add new people, remove unticked ones.
+        $role = ($project['role'] ?? 'editor') === 'viewer' ? 'viewer' : 'editor';
+        $wanted = array_values(array_unique((array) ($project['users'] ?? [])));
 
-        foreach ($project['users'] as $id_hash) {
+        $this->db_main->run(
+            'SELECT users.id_hash FROM projects_users INNER JOIN users ON users.id = projects_users.user_id
+                WHERE projects_users.project_id = ? AND projects_users.role != ?',
+            [$project_id, 'owner']
+        );
+        $current = $this->db_main->getResultRows(PDO::FETCH_COLUMN);
 
-            $columns = [
-                $project_id,
-                $id_hash
-            ];
+        foreach (array_diff($current, $wanted) as $id_hash) {
 
-            $this->db_main->run($sql, $columns);
+            $this->db_main->run(
+                "DELETE FROM projects_users WHERE project_id = ? AND role != 'owner'
+                    AND user_id = (SELECT id FROM users WHERE id_hash = ?)",
+                [$project_id, $id_hash]
+            );
+        }
+
+        foreach (array_diff($wanted, $current) as $id_hash) {
+
+            $this->db_main->run(
+                "INSERT OR IGNORE INTO projects_users (project_id, user_id, role)
+                    SELECT ?, id, ? FROM users WHERE id_hash = ? AND id NOT IN
+                        (SELECT user_id FROM projects_users WHERE project_id = ? AND role = 'owner')",
+                [$project_id, $role, $id_hash, $project_id]
+            );
         }
 
         $this->db_main->commit();
@@ -379,8 +370,8 @@ EOT;
         $sql = <<<EOT
 INSERT OR IGNORE
     INTO projects_users
-    (project_id, user_id)
-    VALUES (?, ?)
+    (project_id, user_id, role)
+    VALUES (?, ?, 'viewer')
 EOT;
 
         $columns = [
@@ -427,7 +418,7 @@ EOT;
         $sql = <<<EOT
 DELETE
     FROM projects_users
-    WHERE project_id = ? AND user_id = ?
+    WHERE project_id = ? AND user_id = ? AND role != 'owner'
 EOT;
 
         $columns = [
@@ -448,15 +439,19 @@ EOT;
      */
     protected function _inactivate(int $project_id): void {
 
+        if (ProjectAccess::atLeast($this->projectRole($project_id), 'owner') === false) {
+
+            throw new Exception('you are not authorized to change this project', 403);
+        }
+
         $sql = <<<EOT
 UPDATE projects
     SET is_active = 'N'
-    WHERE id = ? AND user_id = ?
+    WHERE id = ? AND is_public = 'N'
 EOT;
 
         $columns = [
-            $project_id,
-            $this->user_id
+            $project_id
         ];
 
         $this->db_main->run($sql, $columns);
@@ -470,15 +465,19 @@ EOT;
      */
     protected function _activate(int $project_id): void {
 
+        if (ProjectAccess::atLeast($this->projectRole($project_id), 'owner') === false) {
+
+            throw new Exception('you are not authorized to change this project', 403);
+        }
+
         $sql = <<<EOT
 UPDATE projects
     SET is_active = 'Y'
-    WHERE id = ? AND user_id = ?
+    WHERE id = ? AND is_public = 'N'
 EOT;
 
         $columns = [
-            $project_id,
-            $this->user_id
+            $project_id
         ];
 
         $this->db_main->run($sql, $columns);
@@ -498,14 +497,19 @@ EOT;
             throw new Exception('you are not authorized to access this project', 403);
         }
 
+        // Access model: only the owner (or an admin) deletes, and never the Public project.
+        if (ProjectAccess::atLeast($this->projectRole($project_id), 'owner') === false) {
+
+            throw new Exception('you are not authorized to delete this project', 403);
+        }
+
         $sql = <<<EOT
 DELETE FROM projects
-    WHERE id = ? AND user_id = ?
+    WHERE id = ? AND is_public = 'N'
 EOT;
 
         $columns = [
-            $project_id,
-            $this->user_id
+            $project_id
         ];
 
         $this->db_main->run($sql, $columns);

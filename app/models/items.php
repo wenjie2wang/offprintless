@@ -9,6 +9,7 @@ use Psr\Http\Message\StreamInterface;
 use Librarian\ItemMeta;
 use Librarian\Media\Language;
 use Librarian\Media\ScalarUtils;
+use Librarian\Security\ProjectAccess;
 use Librarian\Security\Sanitation;
 use PDO;
 use ZipArchive;
@@ -2238,6 +2239,17 @@ EOT;
 
         $this->db_main->beginTransaction();
 
+        // Access model: the clipboard may only hold items the user can see.
+        foreach ($items as $guard_id) {
+
+            if ($this->itemRole((int) $guard_id) === null) {
+
+                $this->db_main->rollBack();
+                throw new Exception('item not found', 404);
+            }
+        }
+
+
         // Insert into clipboard.
         $sql = <<<EOT
 INSERT OR IGNORE
@@ -2335,6 +2347,22 @@ EOT;
             throw new Exception('you are not authorized to edit this project', 403);
         }
 
+        // Access model: adding needs editor rights on the project, and the user must be able to see each item.
+        if (ProjectAccess::atLeast($this->projectRole($project_id), 'editor') === false) {
+
+            $this->db_main->rollBack();
+            throw new Exception('you are not authorized to edit this project', 403);
+        }
+
+        foreach ($item_ids as $guard_id) {
+
+            if ($this->itemRole((int) $guard_id) === null) {
+
+                $this->db_main->rollBack();
+                throw new Exception('item not found', 404);
+            }
+        }
+
         // Insert into project.
         $sql = <<<EOT
 INSERT OR IGNORE
@@ -2395,6 +2423,13 @@ EOT;
             throw new Exception('you are not authorized to edit this project', 403);
         }
 
+        // Access model: removing needs editor rights on the project.
+        if (ProjectAccess::atLeast($this->projectRole($project_id), 'editor') === false) {
+
+            $this->db_main->rollBack();
+            throw new Exception('you are not authorized to edit this project', 403);
+        }
+
         $sql = <<<EOT
 DELETE
     FROM projects_items
@@ -2434,6 +2469,21 @@ EOT;
         }
 
         $this->db_main->beginTransaction();
+
+        // Access model: tagging changes the item, so it needs editor rights on every item.
+        foreach ($items as $guard_id) {
+
+            try {
+
+                $this->requireItemRole((int) $guard_id, 'editor');
+
+            } catch (Exception $exc) {
+
+                $this->db_main->rollBack();
+                throw $exc;
+            }
+        }
+
 
         // Insert into clipboard.
         $sql = <<<EOT
@@ -2479,6 +2529,21 @@ EOT;
         }
 
         $this->db_main->beginTransaction();
+
+        // Access model: tagging changes the item, so it needs editor rights on every item.
+        foreach ($items as $guard_id) {
+
+            try {
+
+                $this->requireItemRole((int) $guard_id, 'editor');
+
+            } catch (Exception $exc) {
+
+                $this->db_main->rollBack();
+                throw $exc;
+            }
+        }
+
 
         $sql = <<<EOT
 DELETE FROM items_tags
@@ -3214,6 +3279,12 @@ EOT;
         /** @var Language $lang */
         $lang = $this->di->getShared('Language');
         $lang->setLanguage($locale);
+
+        // Access model: export only what the user can see; hide the rest as not found.
+        foreach ($items as $guard_id) {
+
+            $this->requireItemRole((int) $guard_id, 'viewer');
+        }
 
         $zip_file = IL_TEMP_PATH . DIRECTORY_SEPARATOR . uniqid('export_') . '.zip';
 
