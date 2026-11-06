@@ -71,6 +71,21 @@ SQL;
 
     private ?ProjectAccess $project_access = null;
 
+    /**
+     * Access model: an item "exists" only if the user can see it. Every model that guards on
+     * idExists() therefore answers 404 for items in projects the user cannot see, hiding them.
+     * Callers that also write must follow with requireItemRole($id, 'editor').
+     */
+    protected function idExists($item_id): bool {
+
+        if (isset($this->user_id, $this->permissions) === false) {
+
+            return parent::idExists($item_id);
+        }
+
+        return $this->itemRole((int) $item_id) !== null;
+    }
+
     protected function access(): ProjectAccess {
 
         return $this->project_access ??= new ProjectAccess($this->db_main);

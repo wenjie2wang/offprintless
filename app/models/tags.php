@@ -407,6 +407,9 @@ EOT;
             throw new Exception('this item does not exist', 404);
         }
 
+        // Access model: changing an item needs editor rights in a project that holds it.
+        $this->requireItemRole((int) $item_id, 'editor');
+
         foreach ($tag_ids as $tag_id) {
 
             $this->db_main->run($sql, [$item_id, $tag_id]);
@@ -436,6 +439,9 @@ EOT;
             $this->db_main->rollBack();
             throw new Exception('this item does not exist', 404);
         }
+
+        // Access model: changing an item needs editor rights in a project that holds it.
+        $this->requireItemRole((int) $item_id, 'editor');
 
         $this->db_main->run($sql, [$item_id, $tag_id]);
 

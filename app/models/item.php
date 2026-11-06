@@ -1298,6 +1298,13 @@ SQL;
             $item_ids = [$item_ids];
         }
 
+        // Access model: deleting needs editor rights in a project that holds each item. Checked for
+        // ALL items before anything is deleted, so a rejected batch deletes nothing.
+        foreach ($item_ids as $guard_id) {
+
+            $this->requireItemRole((int) $guard_id, 'editor');
+        }
+
         $sql_delete = <<<EOT
 DELETE
     FROM items

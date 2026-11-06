@@ -62,6 +62,9 @@ class SupplementsModel extends AppModel {
             throw new Exception('this item does not exist', 404);
         }
 
+        // Access model: changing an item needs editor rights in a project that holds it.
+        $this->requireItemRole((int) $item_id, 'editor');
+
         $this->db_main->commit();
 
         // Save supplementary file.
@@ -101,6 +104,9 @@ class SupplementsModel extends AppModel {
             throw new Exception('this item does not exist', 404);
         }
 
+        // Access model: changing an item needs editor rights in a project that holds it.
+        $this->requireItemRole((int) $item_id, 'editor');
+
         $this->db_main->commit();
 
         // Save supplementary file.
@@ -135,6 +141,9 @@ class SupplementsModel extends AppModel {
             $this->db_main->rollBack();
             throw new Exception('this item does not exist', 404);
         }
+
+        // Access model: changing an item needs editor rights in a project that holds it.
+        $this->requireItemRole((int) $item_id, 'editor');
 
         $this->db_main->commit();
 
@@ -233,6 +242,9 @@ EOT;
             $this->db_main->rollBack();
             throw new Exception('this item does not exist', 404);
         }
+
+        // Access model: changing an item needs editor rights in a project that holds it.
+        $this->requireItemRole((int) $item_id, 'editor');
 
         $this->db_main->commit();
 
