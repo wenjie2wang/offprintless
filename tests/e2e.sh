@@ -63,7 +63,9 @@ chk "BOB CANNOT SEE alice's item in his library"           "$(has "$(lib $BOB)" 
 chk "bob sees his own item (it was filed in Public)"       "$(has "$(lib $BOB)" 'Bob paper')" "1"
 chk "alice also sees bob's item (Public is shared)"        "$(has "$(lib $ALI)" 'Bob paper')" "1"
 AID=$(podman exec il-e2e php -r '$p=new PDO("sqlite:/i-librarian/data/database/main.db"); echo $p->query("select id from items where title=\"Alice secret paper\"")->fetchColumn();')
-chk "BOB CANNOT open alice's item by guessing its id"      "$(code $BOB "item?id=$AID")" "404"
+# Note: item?id= is only the page shell (it answers 500 on the unmodified upstream code too); the data
+# endpoints below are what matter.
+chk "BOB CANNOT read alice's item (item data) by guessing id" "$(code $BOB "item/edit?id=$AID")" "404"
 chk "BOB CANNOT read alice's item summary by id"           "$(code $BOB "summary?id=$AID")" "404"
 chk "alice can open her item by id"                        "$(code $ALI "summary?id=$AID")" "200"
 
