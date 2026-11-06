@@ -560,14 +560,14 @@ EOT;
 SELECT page, annotations.id, id_hash, IFNULL(last_name, username) as username, item_id, annotation_top, annotation_left, annotation
     FROM annotations
     INNER JOIN users ON annotations.user_id = users.id
-    WHERE item_id = ?
+    WHERE item_id = ? AND annotations.user_id = ?
     ORDER BY page, annotation_top
 EOT;
 
         $this->db_main->run($sql_highlights, [$item_id, $this->user_id]);
         $output['highlights'] = array_replace($pages, $this->db_main->getResultRows(PDO::FETCH_ASSOC | PDO::FETCH_GROUP));
 
-        $this->db_main->run($sql_notes, [$item_id]);
+        $this->db_main->run($sql_notes, [$item_id, $this->user_id]);
         $output['notes'] = array_replace($pages, $this->db_main->getResultRows(PDO::FETCH_ASSOC | PDO::FETCH_GROUP));
 
         $this->db_main->commit();
@@ -884,14 +884,14 @@ EOT;
 SELECT page, annotations.id, id_hash, IFNULL(last_name, username) as username, item_id, annotation_top, annotation_left, annotation
     FROM annotations
     INNER JOIN users ON annotations.user_id = users.id
-    WHERE item_id = ?
+    WHERE item_id = ? AND annotations.user_id = ?
     ORDER BY page, annotation_top
 EOT;
 
             $this->db_main->run($sql_highlights, [$item_id, $this->user_id]);
             $highlights = $this->db_main->getResultRows(PDO::FETCH_ASSOC);
 
-            $this->db_main->run($sql_notes, [$item_id]);
+            $this->db_main->run($sql_notes, [$item_id, $this->user_id]);
             $annotations = $this->db_main->getResultRows(PDO::FETCH_ASSOC);
 
             // Add notes and highlights.

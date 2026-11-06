@@ -31,13 +31,16 @@ class DashboardModel extends AppModel {
 
         $this->db_main->beginTransaction();
 
+        // Access model: everything below is limited to items in projects the user can see.
+        $visible = $this->visibleItems();
+
         /*
          * Count.
          */
         $sql = <<<EOT
-SELECT total_count
-    FROM stats
-    WHERE table_name = 'items';
+SELECT count(*)
+    FROM items
+    WHERE id IN ({$visible})
 EOT;
 
         $this->db_main->run($sql);
@@ -51,6 +54,7 @@ EOT;
         $sql_items = <<<EOT
 SELECT id
     FROM items
+    WHERE id IN ({$visible})
     ORDER BY id DESC
     LIMIT 5
 EOT;
@@ -109,6 +113,7 @@ EOT;
         $sql_discussed = <<<EOT
 SELECT DISTINCT item_id
     FROM item_discussions
+    WHERE item_id IN ({$visible})
     ORDER BY id DESC
     LIMIT 5
 EOT;
@@ -144,6 +149,7 @@ EOT;
         $sql_notes = <<<EOT
 SELECT DISTINCT item_id
     FROM item_notes
+    WHERE item_id IN ({$visible})
     ORDER BY id DESC
     LIMIT 5
 EOT;
@@ -274,9 +280,11 @@ EOT;
          * Tags for search.
          */
 
-        $sql_tags = <<<'EOT'
-SELECT id, tag
+        $sql_tags = <<<EOT
+SELECT DISTINCT id, tag
     FROM tags
+    INNER JOIN items_tags ON tags.id = items_tags.tag_id
+    WHERE items_tags.item_id IN ({$visible})
     ORDER BY tag COLLATE utf8Collation
 EOT;
 
