@@ -38,5 +38,8 @@ final class Installation {
 
         // Update items_authors primary index.
         $this->model->updateItemsAuthorsPrimaryIndex();
+
+        // Project-based access model: roles, Public project.
+        $this->model->createProjectAccessModel();
     }
 }

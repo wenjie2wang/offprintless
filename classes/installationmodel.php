@@ -12,6 +12,7 @@ use PDO;
  * @method void createReferenceTypeIndex()
  * @method void createTables(bool $force = false)
  * @method void updateItemsAuthorsPrimaryIndex()
+ * @method void createProjectAccessModel()
  */
 class InstallationModel extends Model {
 
@@ -226,6 +227,47 @@ class InstallationModel extends Model {
             /** @var PDO $pdo */
             $pdo = $this->db_main->getPDO();
             $pdo->exec($sql);
+        }
+
+        $this->db_main->close();
+    }
+
+    /**
+     * Add project roles, the Public project, and file orphan items in it. Runs once.
+     *
+     * @throws Exception
+     */
+    protected function _createProjectAccessModel(): void {
+
+        $this->db_main = $this->di->get('Db_main');
+        $this->db_main->connect();
+
+        $this->db_main->run("SELECT count(*) FROM pragma_table_info('projects') WHERE name = 'is_public'");
+        $done = (int) $this->db_main->getResult() > 0;
+
+        if ($done === false) {
+
+            $sql_file = IL_APP_PATH . DIRECTORY_SEPARATOR . 'media' . DIRECTORY_SEPARATOR . 'main_update_3.sql';
+
+            if (is_readable($sql_file) === false) {
+
+                throw new Exception("update failed: could not read the <kbd>$sql_file</kbd> file");
+            }
+
+            /** @var PDO $pdo */
+            $pdo = $this->db_main->getPDO();
+            $pdo->beginTransaction();
+
+            try {
+
+                $pdo->exec(file_get_contents($sql_file));
+                $pdo->commit();
+
+            } catch (Exception $exc) {
+
+                $pdo->rollBack();
+                throw $exc;
+            }
         }
 
         $this->db_main->close();
