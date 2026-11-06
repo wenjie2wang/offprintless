@@ -98,5 +98,26 @@ check("after being invited, dan sees alice (shared project) in his list", in_arr
 $as($adminH, 'A');
 check("admin sees everyone", count($names()) >= 4, true);
 
+echo "--- creating items: where they land ---\n";
+$save = fn(array $projects) => $app->model('ItemModel')->save(array_filter([
+    'title' => 'new item', 'reference_type' => 'article', 'projects' => $projects ?: null,
+]));
+$lastItemProjects = fn() => array_map('intval', array_column($app->sql(
+    'SELECT project_id FROM projects_items WHERE item_id = (SELECT max(id) FROM items) ORDER BY project_id'), 'project_id'));
+
+$as($aliceH, 'U');
+$save([]);
+check('an item saved with no project lands in Public (never invisible)', $lastItemProjects(), [$publicId]);
+
+$save([$iid]);
+check('owner can save an item into her own project', $lastItemProjects(), [$iid]);
+
+$as($bobH, 'U');   // viewer of "Items P"
+check('viewer cannot save an item into that project', code(fn() => $save([$iid])), 403);
+check('...and nothing half-saved was left behind', $app->sql("SELECT count(*) c FROM items WHERE title='new item'")[0]['c'], 2);
+
+$as($carolH, 'G'); // invited-only, not a member of Public with write rights
+check('invited-only user cannot add items to Public', code(fn() => $save([])), 403);
+
 echo $fails === 0 ? "\nALL PASSED\n" : "\n$fails FAILED\n";
 exit($fails === 0 ? 0 : 1);
