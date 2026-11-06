@@ -27,9 +27,13 @@ class AuthorsModel extends AppModel {
 
             case 'library':
 
-                $sql = <<<'EOT'
+                // Access model: only authors of items the user can see.
+                $visible = $this->visibleItems();
+
+                $sql = <<<EOT
 SELECT id, last_name || CASE first_name WHEN '' THEN '' ELSE ', ' || first_name END AS author_name
     FROM authors
+    WHERE id IN (SELECT author_id FROM items_authors WHERE item_id IN ({$visible}))
     ORDER BY last_name COLLATE utf8Collation
     LIMIT 100
 EOT;
@@ -131,10 +135,13 @@ EOT;
 
             case 'library':
 
-                $sql = <<<'EOT'
+                $visible = $this->visibleItems();
+
+                $sql = <<<EOT
 SELECT authors.id, authors.last_name || CASE authors.first_name WHEN '' THEN '' ELSE ', ' || authors.first_name END AS author_name
     FROM authors INNER JOIN ind_authors ON ind_authors.id=authors.id
     WHERE ind_authors.author LIKE ?
+        AND authors.id IN (SELECT author_id FROM items_authors WHERE item_id IN ({$visible}))
     ORDER BY authors.last_name COLLATE utf8Collation
     LIMIT 100
 EOT;

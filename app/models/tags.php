@@ -3,6 +3,7 @@
 namespace LibrarianApp;
 
 use Exception;
+use Librarian\Security\ProjectAccess;
 use PDO;
 
 /**
@@ -39,14 +40,19 @@ class TagsModel extends AppModel {
             case 'library':
 
                 // Select all.
-                $sql0 = <<<'EOT'
-SELECT id, tag
+                $visible = $this->visibleItems();
+
+                $sql0 = <<<EOT
+SELECT DISTINCT id, tag
     FROM tags
+    INNER JOIN items_tags ON tags.id=items_tags.tag_id
+    WHERE items_tags.item_id IN ({$visible})
+    AND items_tags.item_id IN ({$visible})
     ORDER BY tag COLLATE utf8Collation
 EOT;
 
                 // Filter with 1 tag_id.
-                $sql1 = <<<'EOT'
+                $sql1 = <<<EOT
 SELECT id, tag
     FROM tags
     INNER JOIN items_tags ON tags.id=items_tags.tag_id
@@ -55,11 +61,12 @@ SELECT id, tag
             FROM items_tags
             WHERE tag_id = ?
     ) AND tag_id != ?
-    ORDER BY tag  COLLATE utf8Collation
+    AND items_tags.item_id IN ({$visible})
+    ORDER BY tag COLLATE utf8Collation
 EOT;
 
                 // Filter with 2 tag_ids.
-                $sql2 = <<<'EOT'
+                $sql2 = <<<EOT
 SELECT id, tag
     FROM tags
     INNER JOIN items_tags ON tags.id=items_tags.tag_id
@@ -72,11 +79,12 @@ SELECT id, tag
             FROM items_tags
             WHERE tag_id = ?
     ) AND tag_id != ? AND tag_id != ?
+    AND items_tags.item_id IN ({$visible})
     ORDER BY tag COLLATE utf8Collation
 EOT;
 
                 // Filter with 3 tag_ids.
-                $sql3 = <<<'EOT'
+                $sql3 = <<<EOT
 SELECT id, tag
     FROM tags
     INNER JOIN items_tags ON tags.id=items_tags.tag_id
@@ -93,6 +101,7 @@ SELECT id, tag
             FROM items_tags
             WHERE tag_id = ?
     ) AND tag_id != ?  AND tag_id != ?  AND tag_id != ?
+    AND items_tags.item_id IN ({$visible})
     ORDER BY tag COLLATE utf8Collation
 EOT;
 
@@ -371,9 +380,10 @@ EOT;
         $this->db_main->beginTransaction();
 
         $sql = <<<EOT
-SELECT id, tag
+SELECT DISTINCT id, tag
     FROM tags
-    WHERE tag LIKE ?
+    INNER JOIN items_tags ON tags.id = items_tags.tag_id
+    WHERE tag LIKE ? AND items_tags.item_id IN ({$this->visibleItems()})
     ORDER BY tag COLLATE utf8Collation
 EOT;
 
@@ -449,12 +459,39 @@ EOT;
     }
 
     /**
+     * Throw 403 unless the user may edit every item carrying the tag.
+     *
+     * @throws Exception
+     */
+    private function requireTagEditable(int $tag_id): void {
+
+        if ($this->permissions === 'A') {
+
+            return;
+        }
+
+        $this->db_main->run('SELECT item_id FROM items_tags WHERE tag_id = ?', [$tag_id]);
+
+        foreach ($this->db_main->getResultRows(PDO::FETCH_COLUMN) as $item_id) {
+
+            if (ProjectAccess::atLeast($this->itemRole((int) $item_id), 'editor') === false) {
+
+                throw new Exception('this tag is used by items you cannot edit', 403);
+            }
+        }
+    }
+
+    /**
      * Delete tag.
      *
      * @param int $tag_id
      * @throws Exception
      */
     protected function _deleteTag(int $tag_id): void {
+
+        // Access model: a tag is shared across items, so changing it changes those items. Allow it only
+        // if the user may edit every item that carries the tag (admins always; unused tags by any creator).
+        $this->requireTagEditable($tag_id);
 
         $sql = <<<'EOT'
 DELETE FROM tags WHERE id = ?
@@ -471,6 +508,10 @@ EOT;
      * @throws Exception
      */
     protected function _renameTag(int $tag_id, string $tag_name): void {
+
+        // Access model: a tag is shared across items, so changing it changes those items. Allow it only
+        // if the user may edit every item that carries the tag (admins always; unused tags by any creator).
+        $this->requireTagEditable($tag_id);
 
         // Find out if a tag with the new name already exists.
         $sql = <<<SQL
@@ -573,10 +614,14 @@ EOT;
      */
     protected function _getTagCounts(): array {
 
-        $sql = <<<'EOT'
-SELECT tags.id, tags.tag, items_tags.item_id, count(*) as count
+        $visible = $this->visibleItems();
+
+        $sql = <<<EOT
+SELECT tags.id, tags.tag, items_tags.item_id, count(items_tags.item_id) as count
     FROM tags
-    LEFT OUTER JOIN items_tags ON tags.id = items_tags.tag_id
+    LEFT OUTER JOIN items_tags ON tags.id = items_tags.tag_id AND items_tags.item_id IN ({$visible})
+    WHERE items_tags.item_id IS NOT NULL
+        OR NOT EXISTS (SELECT 1 FROM items_tags it WHERE it.tag_id = tags.id)
     GROUP BY tags.tag
     ORDER BY tags.tag
     COLLATE utf8Collation

@@ -39,9 +39,12 @@ class PublicationtitlesModel extends AppModel {
 
             case 'library':
 
+                $visible = $this->visibleItems();
+
                 $sql = <<<EOT
 SELECT id, {$type}
     FROM {$type}s
+    WHERE id IN (SELECT {$type}_id FROM items WHERE id IN ({$visible}))
     ORDER BY {$type} COLLATE utf8Collation
     LIMIT 100
 EOT;
@@ -140,11 +143,14 @@ EOT;
 
             case 'library':
 
+                $visible = $this->visibleItems();
+
                 $sql = <<<EOT
 SELECT ind_{$type}s.id AS id, {$type}s.{$type}
     FROM {$type}s
     INNER JOIN ind_{$type}s ON {$type}s.id=ind_{$type}s.id
     WHERE ind_{$type}s.{$type} LIKE ?
+        AND {$type}s.id IN (SELECT {$type}_id FROM items WHERE id IN ({$visible}))
     ORDER BY {$type}s.{$type} COLLATE utf8Collation
     LIMIT 100
 EOT;

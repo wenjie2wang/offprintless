@@ -27,9 +27,12 @@ class EditorsModel extends AppModel {
 
             case 'library':
 
-                $sql = <<<'EOT'
+                $visible = $this->visibleItems();
+
+                $sql = <<<EOT
 SELECT id, last_name || CASE first_name WHEN '' THEN '' ELSE ', ' || first_name END AS editor_name
     FROM editors
+    WHERE id IN (SELECT editor_id FROM items_editors WHERE item_id IN ({$visible}))
     ORDER BY last_name COLLATE utf8Collation
     LIMIT 100
 EOT;
@@ -131,10 +134,13 @@ EOT;
 
             case 'library':
 
-                $sql = <<<'EOT'
+                $visible = $this->visibleItems();
+
+                $sql = <<<EOT
 SELECT editors.id, editors.last_name || CASE editors.first_name WHEN '' THEN '' ELSE ', ' || editors.first_name END AS editor_name
     FROM editors INNER JOIN ind_editors ON ind_editors.id=editors.id
     WHERE ind_editors.editor LIKE ?
+        AND editors.id IN (SELECT editor_id FROM items_editors WHERE item_id IN ({$visible}))
     ORDER BY editors.last_name COLLATE utf8Collation
     LIMIT 100
 EOT;

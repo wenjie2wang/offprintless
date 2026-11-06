@@ -55,9 +55,12 @@ class ItemcolumnsModel extends AppModel {
 
             case 'library':
 
+                $visible = $this->visibleItems();
+
                 $sql = <<<EOT
 SELECT DISTINCT {$column_type}
     FROM items
+    WHERE id IN ({$visible})
     ORDER BY {$type} COLLATE utf8Collation {$sort}
     LIMIT 100
 EOT;
@@ -164,11 +167,14 @@ EOT;
 
             case 'library':
 
+                $visible = $this->visibleItems();
+
                 $sql = <<<EOT
 SELECT DISTINCT {$type}
     FROM items
     INNER JOIN ind_items ON items.id = ind_items.id
     WHERE ind_items.{$type}_index LIKE ?
+        AND items.id IN ({$visible})
     ORDER BY items.{$type} COLLATE utf8Collation
     LIMIT 100
 EOT;

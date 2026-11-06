@@ -27,9 +27,12 @@ class KeywordsModel extends AppModel {
 
             case 'library':
 
+                $visible = $this->visibleItems();
+
                 $sql = <<<EOT
 SELECT id, keyword
     FROM keywords
+    WHERE id IN (SELECT keyword_id FROM items_keywords WHERE item_id IN ({$visible}))
     ORDER BY keyword COLLATE utf8Collation
     LIMIT 100
 EOT;
@@ -115,11 +118,14 @@ EOT;
 
             case 'library':
 
+                $visible = $this->visibleItems();
+
                 $sql = <<<EOT
 SELECT keywords.id, keywords.keyword
     FROM keywords
     INNER JOIN ind_keywords ON keywords.id = ind_keywords.id
     WHERE ind_keywords.keyword LIKE ?
+        AND keywords.id IN (SELECT keyword_id FROM items_keywords WHERE item_id IN ({$visible}))
     ORDER BY keywords.keyword COLLATE utf8Collation
     LIMIT 100
 EOT;
