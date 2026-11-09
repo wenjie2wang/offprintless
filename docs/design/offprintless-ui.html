@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Offprintless UI proposal</title>
+<!--
+  Static mockup. Not wired to the app. Open in a browser; the button in the header flips light/dark.
+  The same tokens (the :root block) are what a real theme layer would override on top of Bootstrap 4.
+-->
+<style>
+:root {
+  /* Paper and ink: warm neutrals instead of cold grey, one ink-blue accent, one marker-yellow highlight. */
+  --paper: #f7f4ee;  --paper-2: #efeae0;  --card: #fffdf8;  --line: #ded7c8;
+  --ink: #1d2433;    --ink-2: #4a5468;    --ink-3: #7b8498;
+  --accent: #1f4e8c; --accent-ink: #ffffff; --accent-soft: #e3ebf6;
+  --mark: #f6d765;   --ok: #2f7d5b;  --warn: #b4651f;  --bad: #b3372f;
+  --radius: 10px;  --shadow: 0 1px 2px rgba(29,36,51,.06), 0 4px 14px rgba(29,36,51,.06);
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Noto Serif", serif;
+}
+[data-theme="dark"] {
+  --paper: #14171f;  --paper-2: #1a1e28;  --card: #1f2430;  --line: #2f3646;
+  --ink: #e8e6df;    --ink-2: #b4b9c6;    --ink-3: #868da0;
+  --accent: #7fb0f0; --accent-ink: #0d1624; --accent-soft: #24324a;
+  --mark: #8a7420;   --ok: #5fc596; --warn: #e0a05a; --bad: #ec7f77;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.55 var(--sans); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.app { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+@media (max-width: 860px) { .app { grid-template-columns: 1fr; } .side { position: static; height: auto; } }
+
+/* ---- Sidebar: projects first, because everything lives in a project ---- */
+.side { background: var(--paper-2); border-right: 1px solid var(--line); padding: 18px 14px; position: sticky; top: 0; height: 100vh; overflow: auto; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; font-family: var(--serif); font-size: 21px; letter-spacing: .2px; }
+.brand .mark { width: 28px; height: 28px; border-radius: 7px; background: var(--ink); color: var(--paper); display: grid; place-items: center; font: 700 15px var(--serif); }
+.brand .mark span { border-bottom: 3px solid var(--mark); line-height: 1; padding-bottom: 1px; }
+.nav-h { margin: 18px 8px 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); display: flex; justify-content: space-between; }
+.nav a { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 8px; color: var(--ink-2); }
+.nav a:hover { background: var(--accent-soft); color: var(--ink); text-decoration: none; }
+.nav a.on { background: var(--card); color: var(--ink); box-shadow: var(--shadow); font-weight: 600; }
+.nav .dot { width: 9px; height: 9px; border-radius: 3px; background: var(--c, var(--accent)); flex: none; }
+.nav .n { margin-left: auto; font-size: 12px; color: var(--ink-3); }
+.role { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; border: 1px solid var(--line); border-radius: 99px; padding: 0 6px; color: var(--ink-3); }
+
+/* ---- Top bar ---- */
+.main { min-width: 0; }
+.top { display: flex; gap: 12px; align-items: center; padding: 14px 28px; border-bottom: 1px solid var(--line); background: var(--paper); position: sticky; top: 0; z-index: 2; }
+.search { flex: 1; max-width: 640px; display: flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 99px; padding: 8px 16px; color: var(--ink-3); }
+.search kbd { margin-left: auto; font: 12px var(--sans); border: 1px solid var(--line); border-radius: 5px; padding: 0 6px; }
+.btn { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px; padding: 7px 14px; cursor: pointer; }
+.btn:hover { border-color: var(--ink-3); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 700; }
+
+/* ---- Project page ---- */
+.page { padding: 26px 28px 60px; max-width: 1180px; }
+.crumbs { color: var(--ink-3); font-size: 13px; }
+h1 { font: 600 30px/1.2 var(--serif); margin: 6px 0 4px; }
+.sub { color: var(--ink-2); margin: 0 0 18px; }
+.tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+.tabs a { padding: 8px 2px; color: var(--ink-2); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs a.on { color: var(--ink); border-color: var(--accent); font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; align-items: center; }
+.chip { border: 1px solid var(--line); background: var(--card); border-radius: 99px; padding: 2px 11px; font-size: 13px; color: var(--ink-2); }
+.chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+.layout { display: grid; grid-template-columns: 1fr 340px; gap: 22px; }
+@media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.ref { display: grid; grid-template-columns: 54px 1fr auto; gap: 14px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.ref:last-child { border-bottom: 0; }
+.ref.sel { background: var(--accent-soft); }
+.thumb { width: 54px; height: 70px; border-radius: 4px; background: linear-gradient(160deg, var(--paper-2), var(--line)); border: 1px solid var(--line); position: relative; }
+.thumb::after { content: ""; position: absolute; left: 8px; right: 8px; top: 18px; height: 6px; background: var(--mark); opacity: .9; border-radius: 2px; }
+.ref h3 { font: 600 16px/1.35 var(--serif); margin: 0 0 3px; }
+.ref .meta { color: var(--ink-2); font-size: 13.5px; }
+.ref .tags { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+.tag { font-size: 12px; background: var(--paper-2); border-radius: 5px; padding: 0 7px; color: var(--ink-2); }
+.badge { font-size: 12px; border-radius: 5px; padding: 0 7px; align-self: start; }
+.badge.pdf { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.badge.nopdf { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+
+/* ---- Reader panel: details without leaving the list ---- */
+.panel { padding: 18px; position: sticky; top: 76px; align-self: start; }
+.panel h2 { font: 600 19px/1.3 var(--serif); margin: 0 0 8px; }
+.panel dl { display: grid; grid-template-columns: 82px 1fr; gap: 6px 10px; margin: 14px 0; font-size: 14px; }
+.panel dt { color: var(--ink-3); }
+.hl { background: linear-gradient(transparent 55%, var(--mark) 55%); }
+.note { border-left: 3px solid var(--mark); padding: 4px 12px; color: var(--ink-2); margin: 10px 0; font-size: 14px; }
+.who { font-size: 12px; color: var(--ink-3); }
+.private { font-size: 11px; border: 1px dashed var(--ink-3); border-radius: 4px; padding: 0 5px; margin-left: 6px; }
+
+/* ---- Auth card ---- */
+.signin { width: 380px; max-width: 100%; margin: 40px auto 0; padding: 28px; }
+.signin h2 { font: 600 24px var(--serif); margin: 0 0 4px; }
+.field { margin: 14px 0; } .field label { display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px; }
+.field input { width: 100%; font: inherit; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); }
+.field input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+h4.section { margin: 40px 0 10px; font: 600 13px var(--sans); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+.palette { display: flex; flex-wrap: wrap; gap: 10px; }
+.sw { width: 112px; } .sw i { display: block; height: 44px; border-radius: 8px; border: 1px solid var(--line); } .sw span { font-size: 12px; color: var(--ink-2); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="mark"><span>O</span></div> Offprintless</div>
+    <nav class="nav">
+      <a href="#"><span>Home</span></a>
+      <a href="#">Search everything</a>
+      <a href="#">Clipboard <span class="n">4</span></a>
+      <div class="nav-h"><span>Projects</span><a href="#">+ New</a></div>
+      <a href="#" class="on"><span class="dot"></span>Thesis: Ch. 3 <span class="role">owner</span></a>
+      <a href="#"><span class="dot" style="--c:#2f7d5b"></span>Group reading list <span class="role">editor</span></a>
+      <a href="#"><span class="dot" style="--c:#b4651f"></span>JASA 2026 issues <span class="role">viewer</span></a>
+      <div class="nav-h"><span>Shared with everyone</span></div>
+      <a href="#"><span class="dot" style="--c:#7b8498"></span>Public <span class="n">212</span></a>
+      <div class="nav-h"><span>Find papers</span></div>
+      <a href="#">Crossref &middot; PubMed &middot; arXiv</a>
+      <a href="#">Scopus &middot; ScienceDirect</a>
+      <a href="#">Patents</a>
+      <div class="nav-h"><span>Administrator</span></div>
+      <a href="#">Users &amp; activity</a>
+      <a href="#">Settings</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <div class="search">Search titles, authors, notes, full text <kbd>/</kbd></div>
+      <button class="btn primary">Add reference</button>
+      <button class="btn" onclick="var h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'light':'dark'">Light / dark</button>
+      <div class="avatar">AL</div>
+    </header>
+
+    <main class="page">
+      <div class="crumbs">Projects / Thesis: Ch. 3</div>
+      <h1>Thesis: Ch. 3</h1>
+      <p class="sub">38 references &middot; 3 members &middot; you are the owner</p>
+      <div class="tabs"><a class="on" href="#">References</a><a href="#">Notes</a><a href="#">Discussion</a><a href="#">Members</a><a href="#">Export</a></div>
+      <div class="chips"><span class="chip on">All</span><span class="chip">Has PDF</span><span class="chip">Unread</span><span class="chip">#causal</span><span class="chip">#survival</span><span class="chip">+ tag</span></div>
+
+      <div class="layout">
+        <section class="card">
+          <article class="ref sel"><div class="thumb"></div><div><h3>Doubly robust estimation of causal effects</h3><div class="meta">Funk, Westreich, Wiesen et al. &middot; Am J Epidemiol &middot; 2011</div><div class="tags"><span class="tag">causal</span><span class="tag">estimation</span></div></div><span class="badge pdf">PDF</span></article>
+          <article class="ref"><div class="thumb"></div><div><h3>Semiparametric efficiency in multivariate regression models with missing data</h3><div class="meta">Robins, Rotnitzky &middot; JASA &middot; 1995</div><div class="tags"><span class="tag">missing data</span></div></div><span class="badge pdf">PDF</span></article>
+          <article class="ref"><div class="thumb"></div><div><h3>Targeted maximum likelihood learning</h3><div class="meta">van der Laan, Rubin &middot; Int J Biostat &middot; 2006</div><div class="tags"><span class="tag">causal</span></div></div><span class="badge nopdf">No PDF</span></article>
+          <article class="ref"><div class="thumb"></div><div><h3>Survival analysis with time-varying covariates</h3><div class="meta">Fisher, Lin &middot; Annu Rev Public Health &middot; 1999</div><div class="tags"><span class="tag">survival</span></div></div><span class="badge pdf">PDF</span></article>
+        </section>
+
+        <aside class="card panel">
+          <h2>Doubly robust estimation of causal effects</h2>
+          <div class="meta">Funk, Westreich, Wiesen et al. &middot; 2011</div>
+          <dl><dt>Journal</dt><dd>Am J Epidemiol 173(7)</dd><dt>DOI</dt><dd><a href="#">10.1093/aje/kwq439</a></dd><dt>Tags</dt><dd>causal, estimation</dd><dt>In</dt><dd>Thesis: Ch. 3, Public</dd></dl>
+          <button class="btn primary">Open PDF</button> <button class="btn">Cite</button>
+          <h4 class="section" style="margin-top:22px">Your highlights <span class="private">only you</span></h4>
+          <p><span class="hl">Consistent if either the outcome model or the propensity model is correct.</span> <span class="who">p. 3</span></p>
+          <div class="note">Compare with the TMLE variant in the next paper.</div>
+          <h4 class="section">Added</h4>
+          <div class="who">2026-03-02 &middot; shown to administrators as "added by"</div>
+        </aside>
+      </div>
+
+      <h4 class="section">Sign-in</h4>
+      <div class="card signin">
+        <h2>Welcome back</h2><div class="who">Sign in to your library.</div>
+        <div class="field"><label>Username or email</label><input value="alice"></div>
+        <div class="field"><label>Password</label><input type="password" value="secret"></div>
+        <button class="btn primary" style="width:100%">Sign in</button>
+      </div>
+
+      <h4 class="section">Palette</h4>
+      <div class="palette">
+        <div class="sw"><i style="background:var(--paper)"></i><span>Paper</span></div>
+        <div class="sw"><i style="background:var(--card)"></i><span>Card</span></div>
+        <div class="sw"><i style="background:var(--ink)"></i><span>Ink</span></div>
+        <div class="sw"><i style="background:var(--accent)"></i><span>Accent</span></div>
+        <div class="sw"><i style="background:var(--mark)"></i><span>Highlighter</span></div>
+        <div class="sw"><i style="background:var(--ok)"></i><span>Has PDF</span></div>
+        <div class="sw"><i style="background:var(--warn)"></i><span>No PDF</span></div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>
