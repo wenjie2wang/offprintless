@@ -18,8 +18,8 @@ services:
       dockerfile: Dockerfile.local
       args:
         TIMEZONE: America/New_York
-    image: i-librarian-free:project-access
-    container_name: i-librarian          # same name as the current container, so stop/remove the old one first
+    image: offprintless:project-access
+    container_name: i-librarian          # keeps the current container name, so stop/remove the old one first
     ports:
       - "8185:80"                        # same host port as before; the cloudflare tunnel keeps working
     volumes:

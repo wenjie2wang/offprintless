@@ -59,5 +59,13 @@ echo "--- who may read it ---\n";
 $as($aliceH, 'U');
 check('a non-admin is refused (403)', code(fn() => $app->model('LogsModel')->report(30)), 403);
 
+echo "--- the menu entry is admin-only too ---\n";
+$main = file_get_contents(__DIR__ . '/../app/views/main.php');
+$admin_block = substr($main, strpos($main, "=== 'A') {\n\n            \$menu_arr[] = ["));
+check("the Logs link sits inside the admin-only menu block", strpos($main, "'#logs/main'") > strpos($main, "if (\$this->session->data('permissions') === 'A') {\n\n            \$menu_arr[] = ["), true);
+check('the only Logs link in the menu is that one', substr_count($main, "'#logs/main'"), 1);
+$ctl = file_get_contents(__DIR__ . '/../app/controllers/logs.php');
+check("the controller requires permission 'A' in its constructor", str_contains($ctl, "permissions('A')"), true);
+
 echo $fails === 0 ? "\nALL PASSED\n" : "\n$fails FAILED\n";
 exit($fails === 0 ? 0 : 1);

@@ -3,8 +3,8 @@
 ## Prepare permanent storage directory
 
 ```bash
-mkdir -p /var/www/i-librarian-free/library/data
-chown -R 33:33 /var/www/i-librarian-free/library/data
+mkdir -p /var/www/offprintless/library/data
+chown -R 33:33 /var/www/offprintless/library/data
 ```
 User 33:33 is the user/group ID (UID/GID) that *Offprintless* runs as. In an unlikely case of a conflict, you can set
 the directory permissions to 0777 instead.
@@ -12,40 +12,40 @@ the directory permissions to 0777 instead.
 ## Prepare config file
 
 ```bash
-mkdir -p /var/www/i-librarian-free/library/config
+mkdir -p /var/www/offprintless/library/config
 tar xf I-Librarian-5.11.3-Linux.tar.xz config/ilibrarian-default.ini --strip-components=1
-mv ilibrarian-default.ini /var/www/i-librarian-free/library/config/ilibrarian.ini
+mv ilibrarian-default.ini /var/www/offprintless/library/config/ilibrarian.ini
 ```
 
 ## Build an image
 
 ```bash
-docker build -t i-librarian-free:5.11.3 - < I-Librarian-5.11.3-Linux.tar.xz
+docker build -t offprintless:5.11.3 - < I-Librarian-5.11.3-Linux.tar.xz
 ```
 
 ## Run container
 
 ```bash
-docker run -d --name il-free -p 127.0.0.1:9050:80 -v /var/www/i-librarian-free/library/data:/i-librarian/data \
-  -v /var/www/i-librarian-free/library/config:/i-librarian/config i-librarian-free:5.11.3
+docker run -d --name offprintless -p 127.0.0.1:9050:80 -v /var/www/offprintless/library/data:/i-librarian/data \
+  -v /var/www/offprintless/library/config:/i-librarian/config offprintless:5.11.3
 ```
 
 ## Docker compose alternative
 
 ```YAML
 services:
-  il-free:
-    image: i-librarian-free:5.11.3
-    container_name: il-free
+  offprintless:
+    image: offprintless:5.11.3
+    container_name: offprintless
     restart: always
     ports:
       - "127.0.0.1:9050:80"
     volumes:
       - type: bind
-        source: /var/www/i-librarian-free/library/data
+        source: /var/www/offprintless/library/data
         target: /i-librarian/data
       - type: bind
-        source: /var/www/i-librarian-free/library/config
+        source: /var/www/offprintless/library/config
         target: /i-librarian/config
         read_only: true
 ```
