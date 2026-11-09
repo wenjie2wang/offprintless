@@ -115,9 +115,9 @@ EOT;
 
         // Project found, continue.
 
-        // Project users.
+        // Project users, with their current role.
         $sql = <<<EOT
-SELECT id_hash
+SELECT id_hash, role
     FROM projects_users
     INNER JOIN users ON projects_users.user_id = users.id
     WHERE project_id = ?
@@ -128,7 +128,8 @@ EOT;
         ];
 
         $this->db_main->run($sql, $columns);
-        $project_users = $this->db_main->getResultRows(PDO::FETCH_COLUMN);
+        $project_roles = $this->db_main->getResultRows(PDO::FETCH_KEY_PAIR);
+        $project_users = array_keys($project_roles);
 
         // All users.
         $sql = <<<EOT
@@ -147,10 +148,12 @@ EOT;
         while ($row = $this->db_main->getResultRow()) {
 
             $row['in_project'] = 'N';
+            $row['role'] = null;
 
             if (in_array($row['id_hash'], $project_users) === true) {
 
                 $row['in_project'] = 'Y';
+                $row['role'] = $project_roles[$row['id_hash']];
             }
 
             $output['users'][] = $row;
@@ -382,13 +385,41 @@ EOT;
             );
         }
 
+        // Per-member roles posted as roles[<id_hash>] = viewer|editor. Anything else is ignored: 'owner' can never
+        // be granted here, and an unknown or malformed value must not change a role.
+        $posted_roles = is_array($project['roles'] ?? null) ? $project['roles'] : [];
+        $role_of = function ($id_hash) use ($posted_roles, $role) {
+
+            $wanted_role = $posted_roles[$id_hash] ?? null;
+
+            return ($wanted_role === 'viewer' || $wanted_role === 'editor') ? $wanted_role : null;
+        };
+
         foreach (array_diff($wanted, $current) as $id_hash) {
 
             $this->db_main->run(
                 "INSERT OR IGNORE INTO projects_users (project_id, user_id, role)
                     SELECT ?, id, ? FROM users WHERE id_hash = ? AND id NOT IN
                         (SELECT user_id FROM projects_users WHERE project_id = ? AND role = 'owner')",
-                [$project_id, $role, $id_hash, $project_id]
+                [$project_id, $role_of($id_hash) ?? $role, $id_hash, $project_id]
+            );
+        }
+
+        // Change the role of people who are (still) members. Never touches the owner row.
+        foreach (array_intersect($wanted, $current) as $id_hash) {
+
+            $new_role = $role_of($id_hash);
+
+            if ($new_role === null) {
+
+                continue;
+            }
+
+            $this->db_main->run(
+                "UPDATE projects_users SET role = ?
+                    WHERE project_id = ? AND role != 'owner'
+                    AND user_id = (SELECT id FROM users WHERE id_hash = ?)",
+                [$new_role, $project_id, $id_hash]
             );
         }
 

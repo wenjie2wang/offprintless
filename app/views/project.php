@@ -628,9 +628,34 @@ EOT
                     $el->checked('checked');
                 }
 
-                $user_list .= $el->render();
+                $checkbox = $el->render();
 
                 $el = null;
+
+                // Access model: members get a role dropdown; the owner can change it and save. The owner's own
+                // row is not listed here (the owner is never in this list) and 'owner' cannot be chosen.
+                $role_select = '';
+
+                if ($checked === true) {
+
+                    $current_role = $user['role'] === 'viewer' ? 'viewer' : 'editor';
+                    $hash_attr = $this->sanitation->attr($user['id_hash']);
+
+                    /** @var Bootstrap\Select $el */
+                    $el = $this->di->get('Select');
+
+                    $el->id("project-role-{$hash_attr}");
+                    $el->name("roles[{$hash_attr}]");
+                    $el->style('width: 9rem');
+                    $el->componentSize('small');
+                    $el->option($this->lang->t9n('Editor'), 'editor', $current_role === 'editor');
+                    $el->option($this->lang->t9n('Viewer'), 'viewer', $current_role === 'viewer');
+                    $role_select = $el->render();
+
+                    $el = null;
+                }
+
+                $user_list .= "<div class=\"d-flex justify-content-between align-items-center\">{$checkbox}{$role_select}</div>";
             }
 
             $users_card = "<div class=\"my-2\"><b>{$this->lang->t9n('Users with access')}</b></div>";
