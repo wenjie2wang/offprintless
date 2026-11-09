@@ -106,7 +106,7 @@ class DuplicatesController extends AppController {
 
         // Delete duplicate ids.
         $model = new ItemModel($this->di);
-        $model->delete($this->post['ids']);
+        $model->delete($this->post['ids'], null, false, true);
         $model = null;
 
         $view = new DefaultView($this->di);

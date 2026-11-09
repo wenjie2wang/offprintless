@@ -72,12 +72,21 @@ class ItemController extends AppController {
         // Access model: the project role is enforced in the model, so invited-only users may edit where they are editors.
         $this->authorization->permissions('G');
 
+        // Optional: the project to release the article from. Without it an article held by several projects is refused.
+        $project_id = null;
+
+        if (!empty($this->post['project_id'])) {
+
+            $this->validation->id($this->post['project_id']);
+            $project_id = (int) $this->post['project_id'];
+        }
+
         $model = new ItemModel($this->di);
-        $model->delete($this->post['id']);
+        $model->delete((int) $this->post['id'], $project_id);
 
         // Render view.
         $view = new DefaultView($this->di);
-        return $view->main(['info' => 'item was deleted']);
+        return $view->main(['info' => $project_id === null ? 'item was deleted' : 'item was removed from the project']);
     }
 
     /**

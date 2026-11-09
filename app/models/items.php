@@ -198,7 +198,7 @@ EOT;
 
             $item_ids = array_column($rows, 'item_id');
 
-            $this->omnitool($item_ids, $display_action);
+            $this->omnitool($item_ids, $display_action, $collection === 'project' && is_int($project_id) ? $project_id : null);
 
             return [];
         }
@@ -564,7 +564,7 @@ EOT;
 
             $item_ids = array_column($rows, 'item_id');
 
-            $this->omnitool($item_ids, $display_action);
+            $this->omnitool($item_ids, $display_action, $collection === 'project' && is_int($project_id) ? $project_id : null);
 
             return [];
         }
@@ -1155,7 +1155,7 @@ SQL;
 
             $item_ids = array_column($rows, 'item_id');
 
-            $this->omnitool($item_ids, $display_action);
+            $this->omnitool($item_ids, $display_action, $collection === 'project' && is_int($project_id) ? $project_id : null);
 
             return [];
         }
@@ -1320,7 +1320,7 @@ EOT;
 
             $item_ids = array_column($rows, 'item_id');
 
-            $this->omnitool($item_ids, $display_action);
+            $this->omnitool($item_ids, $display_action, $collection === 'project' && is_int($project_id) ? $project_id : null);
 
             return [];
         }
@@ -1505,7 +1505,7 @@ EOT;
 
             $item_ids = array_column($rows, 'item_id');
 
-            $this->omnitool($item_ids, $display_action);
+            $this->omnitool($item_ids, $display_action, $collection === 'project' && is_int($project_id) ? $project_id : null);
 
             return [];
         }
@@ -1858,7 +1858,7 @@ SQL;
 
             $item_ids = array_column($rows, 'item_id');
 
-            $this->omnitool($item_ids, $display_action);
+            $this->omnitool($item_ids, $display_action, $collection === 'project' && is_int($project_id) ? $project_id : null);
 
             return [];
         }
@@ -2001,7 +2001,7 @@ EOT;
             $item_ids = array_column($rows, 'item_id');
 
             // Peform omnitool actions.
-            $this->omnitool($item_ids, $display_action);
+            $this->omnitool($item_ids, $display_action, $collection === 'project' && is_int($project_id) ? $project_id : null);
 
             return [];
         }
@@ -2176,7 +2176,7 @@ EOT;
             $item_ids = array_column($rows, 'item_id');
 
             // Peform omnitool actions.
-            $this->omnitool($item_ids, $display_action);
+            $this->omnitool($item_ids, $display_action, $collection === 'project' && is_int($project_id) ? $project_id : null);
 
             return [];
         }
@@ -3219,7 +3219,7 @@ EOT;
      * @param array $omnitool_actions
      * @throws Exception
      */
-    protected function omnitool(array $item_ids, array $omnitool_actions): void {
+    protected function omnitool(array $item_ids, array $omnitool_actions, ?int $list_project_id = null): void {
 
         foreach ($omnitool_actions as $key => $value) {
 
@@ -3266,12 +3266,12 @@ EOT;
 
                 case 'delete':
 
-                    // Only admins, and users can delete.
-                    if ($this->permissions === 'A' || $this->permissions === 'U') {
-
-                        $model = new ItemModel($this->di);
-                        $model->delete($item_ids);
-                    }
+                    // "Delete all" acts on the list the user is looking at. In a project's list that means: release
+                    // these articles from this project (an article other projects still hold stays). In the library
+                    // or a search, an article held by one project is deleted, and one held by several is refused with
+                    // a message asking which project to remove it from.
+                    $model = new ItemModel($this->di);
+                    $model->delete($item_ids, $list_project_id);
 
                     break;
             }

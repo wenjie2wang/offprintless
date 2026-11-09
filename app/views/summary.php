@@ -809,7 +809,12 @@ UIDS;
         $el->html($this->lang->t9n('Delete'));
         $el->dataTitle($this->lang->t9n('Delete'));
         $el->dataButton($this->lang->t9n('Yes-NOUN'));
-        $el->dataBody("{$alert_escaped} {$this->lang->t9n('Item will be deleted permanently')}");
+        // An article in several projects is deleted only when the last one lets go. Say so before the user clicks.
+        $held_by = count(array_filter($item['projects'] ?? [], fn($p) => ($p['in_project'] ?? 'N') === 'Y'));
+        $delete_note = $held_by > 1
+            ? $this->lang->t9n('This item is in several projects. Clear the check mark of the projects you no longer need it in; when only one is left, Delete removes it permanently')
+            : $this->lang->t9n('Item will be deleted permanently');
+        $el->dataBody("{$alert_escaped} {$delete_note}");
         $delete_button = $el->render();
 
         $el = null;

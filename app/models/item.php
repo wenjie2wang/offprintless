@@ -17,7 +17,7 @@ use PDO;
 /**
  * Class ItemModel.
  *
- * @method void  delete(int|array $item_id)
+ * @method void  delete(int|array $item_id, ?int $project_id = null, bool $force = false, bool $merged = false)
  * @method array get(int $item_id)
  * @method array importText(array $data)
  * @method array save(array $item)
@@ -1329,12 +1329,27 @@ SQL;
     }
 
     /**
-     * Delete item. Also delete the PDF.
+     * Remove articles the way a shared pointer is released: an article is destroyed only when no project holds it
+     * any more.
+     *
+     * - With $project_id, each article is released from that project. If other projects still hold it, it stays
+     *   (with its PDF, supplements, tags, notes and discussion). If that was the last project, it is destroyed.
+     * - Without a project, an article held by exactly one project is destroyed, as before. One held by several must
+     *   be released from a named project, so a click on "Delete" in one place cannot silently wipe it from another
+     *   (422).
+     * - $force destroys the article in every project at once. Administrators only.
+     * - $merged is for the duplicate merge, which has already copied the article's data and project memberships onto
+     *   the surviving item: the article may be destroyed whatever it was held by.
+     *
+     * Everything is checked before anything is changed, so a batch is all or nothing.
      *
      * @param integer|array $item_ids
+     * @param int|null $project_id Project to release the article from.
+     * @param bool $force Destroy in every project (administrators).
+     * @param bool $merged The article was merged into another item.
      * @throws Exception
      */
-    protected function _delete($item_ids): void {
+    protected function _delete($item_ids, ?int $project_id = null, bool $force = false, bool $merged = false): void {
 
         // Cached assets.
         $this->cache = $this->di->getShared('FileCache');
@@ -1344,86 +1359,142 @@ SQL;
             $item_ids = [$item_ids];
         }
 
-        // Access model: deleting needs editor rights in a project that holds each item. Checked for
-        // ALL items before anything is deleted, so a rejected batch deletes nothing.
+        if ($force === true && $this->permissions !== 'A') {
+
+            throw new Exception('only an administrator can remove an article from every project at once', 403);
+        }
+
+        // Access model, checked for ALL items before anything is changed: the user needs editor rights over each.
         foreach ($item_ids as $guard_id) {
 
             $this->requireItemRole((int) $guard_id, 'editor');
         }
 
-        $sql_delete = <<<EOT
-DELETE
-    FROM items
-    WHERE id = ?
-EOT;
+        if ($project_id !== null) {
 
-        $this->db_main->beginTransaction();
+            // The named project must be one the user may edit, and must hold every article.
+            if (ProjectAccess::atLeast($this->projectRole($project_id), 'editor') === false) {
 
-        foreach ($item_ids as $item_id) {
-
-            // Check if ID exists.
-            if ($this->idExists($item_id) === false) {
-
-                $this->db_main->rollBack();
-                throw new Exception("item $item_id does not exist", 404);
+                throw new Exception('you are not authorized to edit this project', 403);
             }
 
-            $deleted = $this->db_main->run($sql_delete, [$item_id]);
+            foreach ($item_ids as $guard_id) {
 
-            if ($deleted === true) {
+                $this->db_main->run('SELECT count(*) FROM projects_items WHERE project_id = ? AND item_id = ?', [$project_id, (int) $guard_id]);
 
-                if ($this->isPdf($item_id) === true) {
+                if ((int) $this->db_main->getResult() === 0) {
 
-                    $filepath_pdf = $this->idToPdfPath($item_id);
-
-                    // PDF icon.
-                    $this->cache->context('icons');
-                    $key = $this->cache->key($item_id);
-                    $this->cache->delete($key);
-
-                    // Pdf object.
-                    $this->pdf_obj = $this->di->get('Pdf', [$filepath_pdf]);
-
-                    // Page images.
-                    $page_count = $this->pdf_obj->pageCount();
-                    $this->pdf_obj = null;
-
-                    $this->cache->context('pages');
-
-                    for($i = 1; $i <= $page_count; $i++) {
-
-                        $key = $this->cache->key([(int) $item_id, (int) $i]);
-                        $this->cache->delete($key);
-                    }
-
-                    // Bookmarks.
-                    $this->cache->context('bookmarks');
-                    $key = $this->cache->key((int) $item_id);
-                    $this->cache->delete($key);
-
-                    // PDF db.
-                    $this->deleteFile($filepath_pdf . '.db');
-
-                    // Delete PDF.
-                    $this->deleteFile($filepath_pdf);
+                    throw new Exception("item $guard_id is not in this project", 404);
                 }
+            }
 
-                // Searches.
-                $this->cache->context('searches');
-                $this->cache->clear();
+        } elseif ($force === false && $merged === false) {
 
-                // Delete supplements.
-                $filepath_supp = $this->idToSupplementPath($item_id);
-                $files = glob($filepath_supp . '*', GLOB_NOSORT);
+            // No project named: only an article held by a single project can be destroyed outright.
+            foreach ($item_ids as $guard_id) {
 
-                foreach ($files as $file) {
+                $this->db_main->run('SELECT count(*) FROM projects_items WHERE item_id = ?', [(int) $guard_id]);
 
-                    $this->deleteFile($file);
+                if ((int) $this->db_main->getResult() > 1) {
+
+                    throw new Exception("this article is in several projects; clear the check mark of the projects you no longer need it in, then delete it when only one is left", 422);
                 }
             }
         }
 
+        $this->db_main->beginTransaction();
+
+        $destroy = [];
+
+        foreach ($item_ids as $item_id) {
+
+            $item_id = (int) $item_id;
+
+            if ($project_id !== null) {
+
+                // Let go of this project.
+                $this->db_main->run('DELETE FROM projects_items WHERE project_id = ? AND item_id = ?', [$project_id, $item_id]);
+            }
+
+            // Reference count: is any project still holding the article? Without a named project the guard above
+            // has already ensured that at most one does, and that one is being deleted from.
+            $this->db_main->run('SELECT count(*) FROM projects_items WHERE item_id = ?', [$item_id]);
+            $holders = (int) $this->db_main->getResult();
+
+            if ($holders === 0 || $project_id === null || $force === true || $merged === true) {
+
+                $destroy[] = $item_id;
+            }
+        }
+
+        foreach ($destroy as $item_id) {
+
+            $this->db_main->run('DELETE FROM items WHERE id = ?', [$item_id]);
+        }
+
         $this->db_main->commit();
+
+        // Files and caches go only after the database has committed, and only for articles that are really gone.
+        foreach ($destroy as $item_id) {
+
+            $this->removeItemFiles($item_id);
+        }
+
+        // Searches are cached per user and would still list the removed article or link.
+        $this->cache->context('searches');
+        $this->cache->clear();
+    }
+
+    /**
+     * Delete the PDF, its caches and the supplements of an article that no longer exists.
+     *
+     * @param int $item_id
+     * @throws Exception
+     */
+    private function removeItemFiles(int $item_id): void {
+
+        if ($this->isPdf($item_id) === true) {
+
+            $filepath_pdf = $this->idToPdfPath($item_id);
+
+            // PDF icon.
+            $this->cache->context('icons');
+            $this->cache->delete($this->cache->key($item_id));
+
+            // Page images.
+            try {
+
+                $this->pdf_obj = $this->di->get('Pdf', [$filepath_pdf]);
+                $page_count = $this->pdf_obj->pageCount();
+
+            } catch (Exception $exc) {
+
+                // A damaged PDF has no page count; the page images, if any, age out of the cache.
+                $page_count = 0;
+            }
+
+            $this->pdf_obj = null;
+            $this->cache->context('pages');
+
+            for ($i = 1; $i <= $page_count; $i++) {
+
+                $this->cache->delete($this->cache->key([$item_id, $i]));
+            }
+
+            // Bookmarks.
+            $this->cache->context('bookmarks');
+            $this->cache->delete($this->cache->key($item_id));
+
+            // PDF db and the PDF.
+            $this->deleteFile($filepath_pdf . '.db');
+            $this->deleteFile($filepath_pdf);
+        }
+
+        // Supplements.
+        foreach (glob($this->idToSupplementPath($item_id) . '*', GLOB_NOSORT) ?: [] as $file) {
+
+            $this->deleteFile($file);
+        }
     }
 
     /**

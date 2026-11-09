@@ -217,6 +217,15 @@ UPDATE item_discussions
     WHERE item_id = ?
 SQL;
 
+        // Merge project memberships: the surviving article is held by every project that held any of the copies,
+        // so removing the duplicates cannot take an article away from a project.
+        $sql_projects = <<<SQL
+INSERT OR IGNORE INTO projects_items (project_id, item_id)
+    SELECT project_id, ?
+    FROM projects_items
+    WHERE item_id = ?
+SQL;
+
         $this->db_main->beginTransaction();
 
         // Item tags, PDF notes, highlights, discussion.
@@ -231,6 +240,7 @@ SQL;
             $this->db_main->run($sql_annot, $columns);
             $this->db_main->run($sql_marker, $columns);
             $this->db_main->run($sql_discuss, $columns);
+            $this->db_main->run($sql_projects, $columns);
         }
 
         // Merge notes.
