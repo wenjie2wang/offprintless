@@ -1448,22 +1448,21 @@ EOT;
      */
     protected function _importText(array $data): array {
 
-        $count = 0;
+        // The format is recognized from the content, so a byte order mark, comment lines or a provider header in front
+        // of the first record do not matter.
+        $format = \Librarian\Import\ImportUtils::detectFormat((string) $data['text']);
 
-        // Detect type and instantiate correct parser.
-        $trimmed_text = trim($data['text']);
+        switch ($format) {
 
-        switch ($trimmed_text[0]) {
-
-            case '@':
+            case 'bibtex':
                 $this->parser = $this->di->get('BibtexImport', $data['text']);
                 break;
 
-            case '<':
+            case 'endnote':
                 $this->parser = $this->di->get('EndnoteImport', $data['text']);
                 break;
 
-            case 'T':
+            case 'ris':
                 $this->parser = $this->di->get('RisImport', $data['text']);
                 break;
 
@@ -1475,11 +1474,38 @@ EOT;
 
         $pdf_object = new PdfModel($this->di);
 
-        while ($entry = $this->parser->getEntry()) {
+        $result = ['count' => 0, 'skipped' => [], 'failed' => [], 'duplicates' => [], 'pdf_missing' => []];
+
+        while (($entry = $this->parser->getEntry()) !== null) {
 
             set_time_limit(600);
 
-            $item = $this->_save($entry + $data);
+            // A DOI that is already in the library (in a project the user can see) is reported, not refused.
+            foreach ((array) ($entry[ItemMeta::COLUMN['UIDS']] ?? []) as $i => $uid) {
+
+                if (($entry[ItemMeta::COLUMN['UID_TYPES']][$i] ?? null) === 'DOI' && $this->uidInLibrary('DOI', (string) $uid)) {
+
+                    $result['duplicates'][] = ['key' => $entry[ItemMeta::COLUMN['BIBTEX_ID']] ?? null, 'doi' => $uid];
+                }
+            }
+
+            try {
+
+                $item = $this->_save($entry + $data);
+
+            } catch (Exception $exc) {
+
+                $this->db_main->rollBack();
+
+                // No right to add to the project, or not signed in: every entry would fail the same way.
+                if (in_array($exc->getCode(), [401, 403], true)) {
+
+                    throw $exc;
+                }
+
+                $result['failed'][] = ['key' => $entry[ItemMeta::COLUMN['BIBTEX_ID']] ?? null, 'reason' => 'could not be saved'];
+                continue;
+            }
 
             // Save PDF. The path comes from the imported file, so it is only trusted after it resolves to a real file
             // inside the import folder. Whether the user may add to the target project was checked by _save() above.
@@ -1489,27 +1515,57 @@ EOT;
 
                 if ($pdf_file !== null && is_readable($pdf_file)) {
 
-                    $fp = fopen($pdf_file, 'rb');
-                    $stream = \GuzzleHttp\Psr7\Utils::streamFor($fp);
+                    try {
 
-                    $pdf_object->save($item['item_id'], $stream);
+                        $fp = fopen($pdf_file, 'rb');
+                        $stream = \GuzzleHttp\Psr7\Utils::streamFor($fp);
 
-                    $stream = null;
+                        $pdf_object->save($item['item_id'], $stream);
 
-                    // Delete PDF when done.
-                    if (is_writable($pdf_file)) {
+                        $stream = null;
 
-                        unlink($pdf_file);
+                        // Delete PDF when done.
+                        if (is_writable($pdf_file)) {
+
+                            unlink($pdf_file);
+                        }
+
+                    } catch (Exception $exc) {
+
+                        $result['pdf_missing'][] = ['key' => $entry[ItemMeta::COLUMN['BIBTEX_ID']] ?? null, 'file' => $entry['PDF']];
                     }
+
+                } else {
+
+                    // A file already used by an earlier entry, or not in the import folder: the item is still saved.
+                    $result['pdf_missing'][] = ['key' => $entry[ItemMeta::COLUMN['BIBTEX_ID']] ?? null, 'file' => $entry['PDF']];
                 }
             }
 
-            $count++;
+            $result['count']++;
         }
 
         $pdf_object = null;
+        $result['skipped'] = $this->parser->getSkipped();
 
-        return ['count' => $count];
+        return $result;
+    }
+
+    /**
+     * Is there an item with this identifier in a project the user can see?
+     *
+     * @param string $type
+     * @param string $uid
+     * @return bool
+     */
+    private function uidInLibrary(string $type, string $uid): bool {
+
+        $this->db_main->run(
+            "SELECT count(*) FROM uids WHERE uid_type = ? AND uid = ? AND item_id IN ({$this->visibleItems()})",
+            [$type, $uid]
+        );
+
+        return (int) $this->db_main->getResult() > 0;
     }
 
     /**

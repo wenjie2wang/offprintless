@@ -3,7 +3,7 @@
 # Needs a one-time:  podman build -t il-phptest -f tests/Dockerfile.phptest tests
 cd "$(dirname "$0")/.." || exit 1
 fail=0
-for t in upload_limit import_security safe_download logs_retention hardening connectors logs project_notes fix_round project_access item_access project_roles member_roles own_item facet_leak privacy; do
+for t in import_text bibtex_ris upload_limit import_security safe_download logs_retention hardening connectors logs project_notes fix_round project_access item_access project_roles member_roles own_item facet_leak privacy; do
   printf '%-22s' "$t"
   out=$(podman run --rm -v "$PWD":/w -w /w il-phptest php tests/${t}_test.php 2>&1)
   echo "$out" | grep -E "ALL PASSED|FAILED" || { echo "(no result)"; fail=1; }

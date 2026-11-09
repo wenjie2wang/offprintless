@@ -20,6 +20,11 @@ class Endnote {
     private SimpleXMLIterator $iterator;
 
     /**
+     * @var array Records that were read but not usable.
+     */
+    private array $skipped = [];
+
+    /**
      * Endnote constructor.
      *
      * @param Xml $xml
@@ -44,16 +49,52 @@ class Endnote {
      */
     public function getEntry() {
 
-        $record = $this->iterator->current();
+        while (true) {
 
-        // Go to next record.
-        $this->iterator->next();
+            // There are no entries to return. Reading past the last record raises an error, so ask first.
+            if ($this->iterator->valid() === false) {
 
-        // There are no entries to return.
-        if ($record === null) {
+                return null;
+            }
 
-            return null;
+            $record = $this->iterator->current();
+
+            // Go to next record.
+            $this->iterator->next();
+
+            if ($record === null) {
+
+                return null;
+            }
+
+            $entry = $this->build($record);
+
+            if ($entry !== null) {
+
+                return $entry;
+            }
+
+            $this->skipped[] = ['key' => null, 'reason' => 'no title'];
         }
+    }
+
+    /**
+     * @return array
+     */
+    public function getSkipped(): array {
+
+        return $this->skipped;
+    }
+
+    /**
+     * Build the item array from one <record>, or null when it has no title.
+     *
+     * @param SimpleXMLIterator $record
+     * @return array|null
+     */
+    private function build($record): ?array {
+
+        $entry = [];
 
         // Reference type.
         foreach ($record->{'ref-type'}->attributes() as $name => $value) {
@@ -64,6 +105,8 @@ class Endnote {
                 break;
             }
         }
+
+        $entry[ItemMeta::COLUMN['REFERENCE_TYPE']] = $entry[ItemMeta::COLUMN['REFERENCE_TYPE']] ?? 'generic';
 
         // Authors.
         $authors = $record->contributors->authors->author ?? [];
@@ -214,7 +257,7 @@ class Endnote {
 
             $year = strip_tags($year->asXML());
 
-            if (is_numeric($year) && $year > 0 && $year < date('Y')) {
+            if (is_numeric($year) && $year >= 1000 && $year <= (int) date('Y') + 5) {
 
                 $entry[ItemMeta::COLUMN['PUBLICATION_DATE']] = $year . '-01-01';
             }

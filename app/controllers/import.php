@@ -347,10 +347,38 @@ class ImportController extends AppController {
             }
 
             $model = new ItemModel($this->di);
-            $model->importText($this->post);
+            $result = $model->importText($this->post);
+
+            // Say what happened, not only that something did. The counts are integers; titles and keys from the file
+            // are not put into the message.
+            $count = (int) $result['count'];
+            $notes = [];
+
+            if (count($result['skipped']) > 0) {
+
+                $notes[] = count($result['skipped']) . ' skipped (no title)';
+            }
+
+            if (count($result['failed']) > 0) {
+
+                $notes[] = count($result['failed']) . ' could not be saved';
+            }
+
+            if (count($result['duplicates']) > 0) {
+
+                $notes[] = count($result['duplicates']) . ' with a DOI that was already in the library';
+            }
+
+            if (count($result['pdf_missing']) > 0) {
+
+                $notes[] = count($result['pdf_missing']) . ' linked PDFs not found in the import folder';
+            }
+
+            $info = $count . ($count === 1 ? ' item was saved' : ' items were saved');
+            $info .= $notes === [] ? '' : ': ' . join(', ', $notes);
 
             $view = new DefaultView($this->di);
-            return $view->main(['info' => "new items were saved"]);
+            return $view->main(['info' => $info]);
         }
 
         $view = new DefaultView($this->di);

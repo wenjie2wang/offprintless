@@ -5,12 +5,19 @@ namespace Librarian\Import;
 use Exception;
 use Librarian\ItemMeta;
 
+/**
+ * RIS importer.
+ *
+ * A record starts at a "TY  - " line and ends at "ER  - " (or at the next TY, or the end of the text). Every other
+ * line is "XX  - value", where XX is two characters. A line that does not look like a tag continues the previous
+ * value, which is how long abstracts and titles are wrapped.
+ */
 class Ris {
 
     /**
-     * @var string Imported file contents.
+     * @var string[] Records, each the text of one TY ... ER block.
      */
-    private string $input;
+    private array $records = [];
 
     /**
      * @var ItemMeta
@@ -18,210 +25,376 @@ class Ris {
     private ItemMeta $item_meta;
 
     /**
-     * @var array Entry offsets.
+     * @var array Records that were read but not usable.
      */
-    private array $offsets;
+    private array $skipped = [];
+
+    /**
+     * RIS types the application has no exact column for, mapped to one it has.
+     */
+    private const TYPE_ALIASES = [
+        'EJOUR' => 'JOUR', 'JFULL' => 'JOUR', 'MGZN' => 'JOUR', 'NEWS' => 'JOUR', 'ABST' => 'JOUR', 'INPR' => 'JOUR',
+        'CPAPER' => 'CONF', 'CONF' => 'CONF', 'ECHAP' => 'CHAP', 'EBOOK' => 'BOOK', 'EDBOOK' => 'BOOK',
+        'THES' => 'THES', 'RPRT' => 'RPRT', 'SER' => 'BOOK', 'GEN' => 'GEN', 'WEB' => 'ELEC', 'BLOG' => 'ELEC',
+        'COMP' => 'ELEC', 'DATA' => 'DATA', 'DBASE' => 'DATA', 'ELEC' => 'ELEC', 'PAT' => 'PAT', 'STAND' => 'STAND',
+        'UNPB' => 'UNPB', 'BOOK' => 'BOOK', 'CHAP' => 'CHAP', 'JOUR' => 'JOUR', 'MANSCPT' => 'UNPB', 'PCOMM' => 'GEN',
+    ];
 
     public function __construct(ItemMeta $item_meta, string $input) {
 
-        $this->input = $input;
         $this->item_meta = $item_meta;
-
-        // Read entry offsets.
-        preg_match_all("/TY {2}- /u", $input, $matches, PREG_OFFSET_CAPTURE);
-        $this->offsets = empty($matches[0]) ? [] : array_column($matches[0], 1);
+        $this->records = $this->splitRecords(ImportUtils::toUtf8($input));
     }
 
     /**
-     * Entry iterator.
+     * @return array
+     */
+    public function getSkipped(): array {
+
+        return $this->skipped;
+    }
+
+    /**
+     * Cut the text into records, ignoring anything before the first TY and anything after each ER.
+     *
+     * @param string $text
+     * @return string[]
+     */
+    private function splitRecords(string $text): array {
+
+        $records = [];
+        $current = null;
+
+        foreach (explode("\n", $text) as $line) {
+
+            if (preg_match('/^TY {1,2}-(?: |$)/', $line) === 1) {
+
+                // A new TY closes a record that was never closed with ER.
+                if ($current !== null) {
+
+                    $records[] = $current;
+                }
+
+                $current = $line;
+                continue;
+            }
+
+            if ($current === null) {
+
+                continue;
+            }
+
+            if (preg_match('/^ER {1,2}-(?: |$)/', $line) === 1) {
+
+                $records[] = $current;
+                $current = null;
+                continue;
+            }
+
+            $current .= "\n" . $line;
+        }
+
+        if ($current !== null) {
+
+            $records[] = $current;
+        }
+
+        return $records;
+    }
+
+    /**
+     * Entry iterator. Returns the next usable record, or null when the input is used up.
      *
      * @return array|null
      * @throws Exception
      */
     public function getEntry() {
 
-        // There are no entries to return.
-        if (empty($this->offsets)) {
+        while (($text = array_shift($this->records)) !== null) {
 
-            return null;
+            $entry = $this->build($text);
+
+            if ($entry !== null) {
+
+                return $entry;
+            }
         }
 
+        return null;
+    }
+
+    /**
+     * Split a record into [tag, value] pairs. A line that is not a tag continues the previous value.
+     *
+     * @param string $text
+     * @return array
+     */
+    private function tags(string $text): array {
+
+        $pairs = [];
+
+        foreach (explode("\n", $text) as $line) {
+
+            // "XX  - value" (two spaces, the standard) or "XX - value" (one space, used by some exporters).
+            if (preg_match('/^([A-Z][A-Z0-9]) {1,2}-(?: (.*))?$/u', $line, $m) === 1) {
+
+                $pairs[] = [$m[1], trim($m[2] ?? '')];
+
+            } elseif (preg_match('/^PMID ?-\s*(\d+)\s*$/', $line, $m) === 1) {
+
+                // PubMed writes "PMID- 12345678" (and some tools "PMID - 12345678"). It is its own tag, not a
+                // continuation of the line before it.
+                $pairs[] = ['PMID', $m[1]];
+
+            } elseif ($pairs !== [] && trim($line) !== '') {
+
+                $last = count($pairs) - 1;
+                $pairs[$last][1] = trim($pairs[$last][1] . ' ' . trim($line));
+            }
+        }
+
+        return $pairs;
+    }
+
+    /**
+     * @param string $text One record.
+     * @return array|null
+     */
+    private function build(string $text): ?array {
+
+        $C = ItemMeta::COLUMN;
         $entry = [];
-        $key = key($this->offsets);
-        $offset = current($this->offsets);
-        $length = isset($this->offsets[$key + 1]) ? $this->offsets[$key + 1] - $offset : strlen($this->input) - $offset;
+        $pairs = $this->tags($text);
 
-        // Get item string.
-        $str = substr($this->input, $offset, $length);
+        $first = [];
+        $day = null;
+        $py = null;
+        $da = null;
+        $sp = null;
+        $ep = null;
+        $uids = [];
+        $key = null;
+        $type = 'GEN';
 
-        // Remove current offset from offsets.
-        array_shift($this->offsets);
+        $add_uid = function (string $uid_type, ?string $value) use (&$uids): void {
 
-        // Remove line breaks from pretty-printed input.
-        $inner = preg_replace('/\r/u', '', trim($str));
-        $inner = preg_replace('/\n(?![A-Z0-9]{2})/u', ' ', $inner);
+            if ($value !== null && $value !== '' && in_array([$uid_type, $value], $uids, true) === false) {
 
-        // Separate into tags.
-        $parts = explode("\n", $inner);
+                $uids[] = [$uid_type, $value];
+            }
+        };
 
-        // All inner entry tags.
-        foreach ($parts as $part) {
+        foreach ($pairs as [$tag, $value]) {
 
-            $left = substr($part, 0, 2);
-            $right = substr($part, 6);
-
-            if (empty($left) || empty($right)) {
+            if ($value === '') {
 
                 continue;
             }
 
-            switch ($left) {
+            switch ($tag) {
 
                 case 'TY':
-                    // IL type.
-                    $entry[ItemMeta::COLUMN['REFERENCE_TYPE']] = $this->item_meta->convert($right, 'ris', 'il');
+                    $type = strtoupper($value);
+                    break;
+
+                case 'ID':
+                    $key = $value;
                     break;
 
                 case 'TI':
                 case 'T1':
-                    $entry[ItemMeta::COLUMN['TITLE']] = $right;
+                    $entry[$C['TITLE']] = $entry[$C['TITLE']] ?? $value;
                     break;
 
                 case 'JA':
                 case 'J2':
-                    $entry[ItemMeta::COLUMN['PRIMARY_TITLE']] = $right;
+                    $entry[$C['PRIMARY_TITLE']] = $value;
                     break;
 
                 case 'JF':
                 case 'JO':
                 case 'BT':
                 case 'T2':
-                    $entry[ItemMeta::COLUMN['SECONDARY_TITLE']] = $right;
+                    $entry[$C['SECONDARY_TITLE']] = $entry[$C['SECONDARY_TITLE']] ?? $value;
                     break;
 
                 case 'T3':
-                    $entry[ItemMeta::COLUMN['TERTIARY_TITLE']] = $right;
+                    $entry[$C['TERTIARY_TITLE']] = $value;
                     break;
 
                 case 'PY':
                 case 'Y1':
+                    $py = $value;
+                    break;
+
                 case 'DA':
-                    $year = (int) substr($right, 0, 4);
-
-                    if ($year > 0 && $year <= date('Y')) {
-
-                        $entry[ItemMeta::COLUMN['PUBLICATION_DATE']] = $year;
-                    }
-
-                    $parts = explode('/', $right);
-
-                    $month = !empty($parts[1]) && is_numeric($parts[1]) ? str_pad($parts[1], 2, '0', STR_PAD_LEFT) : '01';
-                    $entry[ItemMeta::COLUMN['PUBLICATION_DATE']] .= '-' . $month;
-
-                    $day = !empty($parts[2]) && is_numeric($parts[2]) ? str_pad($parts[2], 2, '0', STR_PAD_LEFT) : '01';
-                    $entry[ItemMeta::COLUMN['PUBLICATION_DATE']] .= '-' . $day;
+                    $da = $value;
                     break;
 
                 case 'VL':
-                    $entry[ItemMeta::COLUMN['VOLUME']] = $right;
+                    $entry[$C['VOLUME']] = $value;
                     break;
 
                 case 'IS':
-                    $entry[ItemMeta::COLUMN['ISSUE']] = $right;
+                    $entry[$C['ISSUE']] = $value;
                     break;
 
                 case 'SP':
-                    $entry[ItemMeta::COLUMN['PAGES']] = $right;
+                    $sp = $value;
                     break;
 
                 case 'EP':
-                    $entry[ItemMeta::COLUMN['PAGES']] .= '-' . $right;
+                    $ep = $value;
                     break;
 
                 case 'PB':
-                    $entry[ItemMeta::COLUMN['PUBLISHER']] = $right;
+                    $entry[$C['PUBLISHER']] = $value;
                     break;
 
                 case 'CY':
-                    $entry[ItemMeta::COLUMN['PLACE_PUBLISHED']] = $right;
+                    $entry[$C['PLACE_PUBLISHED']] = $value;
                     break;
 
                 case 'AB':
                 case 'N2':
-                    $entry[ItemMeta::COLUMN['ABSTRACT']] = $right;
-                    break;
-
-                case 'N1':
-                case 'M3':
-                    preg_match('/10\.\d{4}\/\S+/u', $right, $match);
-                    if (!empty($match[0])) {
-
-                        $entry[ItemMeta::COLUMN['UID_TYPES']][] = 'DOI';
-                        $entry[ItemMeta::COLUMN['UIDS']][] = $match[0];
-                    }
+                    $entry[$C['ABSTRACT']] = $entry[$C['ABSTRACT']] ?? $value;
                     break;
 
                 case 'DO':
-                    $entry[ItemMeta::COLUMN['UID_TYPES']][] = 'DOI';
-                    $entry[ItemMeta::COLUMN['UIDS']][] = $right;
+                    $add_uid('DOI', ImportUtils::doi($value));
                     break;
 
                 case 'UR':
-                    $entry[ItemMeta::COLUMN['URLS']][] = $right;
-                    break;
+                    // A DOI link is an identifier; any link is also kept as a URL.
+                    if (preg_match('~^https?://(dx\.)?doi\.org/~i', $value) === 1) {
 
-                case 'KW':
-                    $entry[ItemMeta::COLUMN['KEYWORDS']][] = $right;
-                    break;
+                        $add_uid('DOI', ImportUtils::doi($value));
+                    }
 
-                case 'AD':
-                    $entry[ItemMeta::COLUMN['AFFILIATION']] = $right;
+                    $entry[$C['URLS']][] = $value;
                     break;
 
                 case 'M2':
-                    preg_match('/(pmid:\s?)(\d+)/ui', $right, $match);
+                case 'AN':
+                    if ($tag === 'M2' && preg_match('/pmid:\s*(\d+)/i', $value, $m) === 1) {
 
-                    if (!empty($match[2])) {
-
-                        $entry[ItemMeta::COLUMN['UID_TYPES']][] = 'PMID';
-                        $entry[ItemMeta::COLUMN['UIDS']][] = $match[2];
+                        $add_uid('PMID', $m[1]);
                     }
+
+                    break;
+
+                case 'PMID':
+                    $add_uid('PMID', $value);
+                    break;
+
+                case 'SN':
+                    if (preg_match('/^(97[89][\d\- ]{10,14}|\d[\d\- ]{8,12}[\dXx])$/', $value) === 1) {
+
+                        $add_uid('ISBN', $value);
+                    }
+
+                    break;
+
+                case 'KW':
+                    $entry[$C['KEYWORDS']][] = $value;
+                    break;
+
+                case 'AD':
+                    $entry[$C['AFFILIATION']] = $value;
                     break;
 
                 case 'AU':
                 case 'A1':
-                    $parts = explode(',', $right);
+                    [$last, $first_name] = ImportUtils::splitRisName($value);
 
-                    if (!empty(trim($parts[0])))  {
+                    if ($last !== '') {
 
-                        $entry[ItemMeta::COLUMN['AUTHOR_LAST_NAME']][] = trim($parts[0]);
+                        $entry[$C['AUTHOR_LAST_NAME']][] = $last;
+                        $entry[$C['AUTHOR_FIRST_NAME']][] = $first_name;
                     }
 
-                    if (isset($parts[1]) && !empty(trim($parts[1])))  {
-
-                        $entry[ItemMeta::COLUMN['AUTHOR_FIRST_NAME']][] = trim($parts[1]);
-                    }
                     break;
 
                 case 'ED':
                 case 'A2':
-                    $parts = explode(',', $right);
+                    [$last, $first_name] = ImportUtils::splitRisName($value);
 
-                    if (!empty(trim($parts[0])))  {
+                    if ($last !== '') {
 
-                        $entry[ItemMeta::COLUMN['EDITOR_LAST_NAME']][] = trim($parts[0]);
+                        $entry[$C['EDITOR_LAST_NAME']][] = $last;
+                        $entry[$C['EDITOR_FIRST_NAME']][] = $first_name;
                     }
 
-                    if (isset($parts[1]) && !empty(trim($parts[1])))  {
-
-                        $entry[ItemMeta::COLUMN['EDITOR_FIRST_NAME']][] = trim($parts[1]);
-                    }
                     break;
 
                 case 'L1':
-                    $entry['PDF'] = $right;
+                    $entry['PDF'] = $entry['PDF'] ?? $value;
                     break;
             }
+        }
+
+        if (empty($entry[$C['TITLE']])) {
+
+            $this->skipped[] = ['key' => $key, 'reason' => 'no title'];
+            return null;
+        }
+
+        // Type: an unknown code becomes a generic reference.
+        $type = self::TYPE_ALIASES[$type] ?? 'GEN';
+        $il_type = $this->item_meta->convert($type, 'ris', 'il');
+        $entry[$C['REFERENCE_TYPE']] = $il_type;
+        $entry[$C['BIBTEX_TYPE']] = $this->item_meta->convert($il_type, 'il', 'bibtex');
+
+        if ($key !== null) {
+
+            $entry[$C['BIBTEX_ID']] = $key;
+        }
+
+        // Pages, whatever mix of SP and EP is present. An SP that already holds a range is kept as it is.
+        if ($sp !== null && $ep !== null && $sp !== $ep && strpos($sp, '-') === false) {
+
+            $entry[$C['PAGES']] = ImportUtils::pages("$sp-$ep");
+
+        } elseif ($sp !== null) {
+
+            $entry[$C['PAGES']] = ImportUtils::pages($sp);
+
+        } elseif ($ep !== null) {
+
+            $entry[$C['PAGES']] = ImportUtils::pages($ep);
+        }
+
+        // Date. PY is the publication year. DA is a full date, but it may also be an access or entry date, so it is
+        // used only when its year agrees with PY, or when PY gives no usable year.
+        $date = null;
+        $py_year = $py === null ? null : ImportUtils::date(ImportUtils::splitDate($py)[0]);
+
+        if ($py !== null) {
+
+            [$y, $m, $d] = ImportUtils::splitDate(str_replace('/', '-', rtrim($py, '/')));
+            $date = ImportUtils::date($y, $m, $d);
+        }
+
+        if ($da !== null) {
+
+            [$y, $m, $d] = ImportUtils::splitDate(str_replace('/', '-', rtrim($da, '/')));
+            $da_date = ImportUtils::date($y, $m, $d);
+
+            if ($da_date !== null && ($date === null || substr($da_date, 0, 4) === substr($date, 0, 4))) {
+
+                $date = $da_date;
+            }
+        }
+
+        if ($date !== null) {
+
+            $entry[$C['PUBLICATION_DATE']] = $date;
+        }
+
+        foreach ($uids as [$uid_type, $uid]) {
+
+            $entry[$C['UID_TYPES']][] = $uid_type;
+            $entry[$C['UIDS']][] = $uid;
         }
 
         return $entry;
