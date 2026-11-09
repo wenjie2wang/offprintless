@@ -95,6 +95,19 @@ SQL;
             }
         }
 
+        // The person who added an item may finish it, even where they are only a viewer (e.g. the Public project:
+        // creators may add there but are not editors of other people's items). This applies only while they can
+        // still see the item, so moving it into a project they are not in takes the right away.
+        if ($best !== null && self::atLeast($best, 'editor') === false) {
+
+            $this->db->run('SELECT count(*) FROM items WHERE id = ? AND added_by = ?', [$item_id, $user_id]);
+
+            if ((int) $this->db->getResult() > 0) {
+
+                $best = 'editor';
+            }
+        }
+
         return $best;
     }
 
