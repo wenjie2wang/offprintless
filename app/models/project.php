@@ -822,8 +822,8 @@ EOT;
 
         // Select title.
         $sql = <<<'EOT'
-SELECT title
-    FROM items
+SELECT project
+    FROM projects
     WHERE id = ?
 EOT;
 
