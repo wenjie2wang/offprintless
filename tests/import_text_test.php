@@ -51,11 +51,12 @@ $t = microtime(true); $r = $imp($big); $ms = (microtime(true) - $t) * 1000;
 check('3000 entries imported', (int) $r['count'], 3000);
 check('...in a reasonable time (under 60 s)', $ms < 60000, true);
 
-echo "--- duplicates ---\n";
+echo "--- duplicates: the same article is not created twice (details in import_dedupe_test) ---\n";
 $r1 = $imp("@article{d1, title={Same paper}, doi={10.1/dup}}");
+$n = count($titles());
 $r2 = $imp("@article{d2, title={Same paper again}, doi={10.1/dup}}");
-check('the second import reports the DOI that already exists', array_column($r2['duplicates'] ?? [], 'doi'), ['10.1/dup']);
-check('...and still imports it (a warning, not a block)', (int) $r2['count'], 1);
+check('the second import is reported as a duplicate', array_column($r2['duplicates'] ?? [], 'key'), ['d2']);
+check('...and not created again', [(int) $r2['count'], count($titles()) - $n], [0, 0]);
 
 echo "--- EndNote XML goes through the same loop ---\n";
 $xml = '<?xml version="1.0" encoding="UTF-8"?><xml><records>'

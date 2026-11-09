@@ -364,9 +364,14 @@ class ImportController extends AppController {
                 $notes[] = count($result['failed']) . ' could not be saved';
             }
 
+            if ((int) $result['linked'] > 0) {
+
+                $notes[] = (int) $result['linked'] . ' already in the library and added to this project';
+            }
+
             if (count($result['duplicates']) > 0) {
 
-                $notes[] = count($result['duplicates']) . ' with a DOI that was already in the library';
+                $notes[] = count($result['duplicates']) . ' skipped (already in this project)';
             }
 
             if (count($result['pdf_missing']) > 0) {
@@ -374,8 +379,15 @@ class ImportController extends AppController {
                 $notes[] = count($result['pdf_missing']) . ' linked PDFs not found in the import folder';
             }
 
-            $info = $count . ($count === 1 ? ' item was saved' : ' items were saved');
-            $info .= $notes === [] ? '' : ': ' . join(', ', $notes);
+            if ($count === 0 && $notes !== []) {
+
+                $info = 'nothing new was saved: ' . join(', ', $notes);
+
+            } else {
+
+                $info = $count . ($count === 1 ? ' item was saved' : ' items were saved');
+                $info .= $notes === [] ? '' : ': ' . join(', ', $notes);
+            }
 
             $view = new DefaultView($this->di);
             return $view->main(['info' => $info]);

@@ -683,20 +683,7 @@ EOT;
 
             foreach ($target_projects as $id) {
 
-                // Authorize project: adding an item needs editor rights, or admin/creator for the Public project.
-                $role = $this->projectRole((int) $id);
-
-                $this->db_main->run("SELECT is_public FROM projects WHERE id = ?", [(int) $id]);
-                $is_public = $this->db_main->getResult() === 'Y';
-
-                $may_add = ProjectAccess::atLeast($role, 'editor')
-                    || ($is_public && ProjectAccess::canCreateProjects($this->permissions));
-
-                if ($may_add === false) {
-
-                    $this->db_main->rollBack();
-                    throw new Exception('you are not authorized to add items to this project', 403);
-                }
+                $this->assertMayAddToProject((int) $id);
 
                 $columns = [
                     (int) $id,
@@ -1474,24 +1461,41 @@ EOT;
 
         $pdf_object = new PdfModel($this->di);
 
-        $result = ['count' => 0, 'skipped' => [], 'failed' => [], 'duplicates' => [], 'pdf_missing' => []];
+        $result = ['count' => 0, 'linked' => 0, 'skipped' => [], 'failed' => [], 'duplicates' => [], 'pdf_missing' => []];
+        $this->dedupe_index = [];
 
         while (($entry = $this->parser->getEntry()) !== null) {
 
             set_time_limit(600);
 
-            // A DOI that is already in the library (in a project the user can see) is reported, not refused.
-            foreach ((array) ($entry[ItemMeta::COLUMN['UIDS']] ?? []) as $i => $uid) {
+            // One copy of an article. If the user can already see it, it is not created again: it is added to the
+            // target project, or skipped with a warning when the project already holds it.
+            $existing = $this->findExistingItem($entry);
 
-                if (($entry[ItemMeta::COLUMN['UID_TYPES']][$i] ?? null) === 'DOI' && $this->uidInLibrary('DOI', (string) $uid)) {
+            if ($existing !== null) {
 
-                    $result['duplicates'][] = ['key' => $entry[ItemMeta::COLUMN['BIBTEX_ID']] ?? null, 'doi' => $uid];
+                $key = $entry[ItemMeta::COLUMN['BIBTEX_ID']] ?? null;
+                $title = $entry[ItemMeta::COLUMN['TITLE']] ?? '';
+                $outcome = $this->linkExistingItem($existing, $data);
+
+                if ($outcome['present'] > 0 || $outcome['linked'] === 0) {
+
+                    $result['duplicates'][] = ['key' => $key, 'title' => $title];
                 }
+
+                if ($outcome['linked'] > 0) {
+
+                    $result['count']++;
+                    $result['linked']++;
+                }
+
+                continue;
             }
 
             try {
 
                 $item = $this->_save($entry + $data);
+                $this->rememberItem((int) $item['item_id'], $entry);
 
             } catch (Exception $exc) {
 
@@ -1552,20 +1556,247 @@ EOT;
     }
 
     /**
-     * Is there an item with this identifier in a project the user can see?
+     * Access rule for adding an item to a project: editor or owner of the project, or a creator/admin for the Public
+     * project. Throws 403 otherwise.
      *
-     * @param string $type
-     * @param string $uid
-     * @return bool
+     * @param int $project_id
+     * @throws Exception
      */
-    private function uidInLibrary(string $type, string $uid): bool {
+    private function assertMayAddToProject(int $project_id): void {
+
+        $role = $this->projectRole($project_id);
+
+        $this->db_main->run("SELECT is_public FROM projects WHERE id = ?", [$project_id]);
+        $is_public = $this->db_main->getResult() === 'Y';
+
+        $may_add = ProjectAccess::atLeast($role, 'editor')
+            || ($is_public && ProjectAccess::canCreateProjects($this->permissions));
+
+        if ($may_add === false) {
+
+            $this->db_main->rollBack();
+            throw new Exception('you are not authorized to add items to this project', 403);
+        }
+    }
+
+    /**
+     * @var array Per-import lookup for the title, year and first author comparison: year => [key => [item ids]].
+     */
+    private array $dedupe_index = [];
+
+    /**
+     * Letters and digits only, accents removed, lower case. "Café -- Culture!" and "cafe culture" are the same.
+     */
+    private function normalizeText(string $text): string {
+
+        $text = \Normalizer::normalize($text, \Normalizer::FORM_D);
+        $text = preg_replace('/\p{Mn}+/u', '', (string) $text);
+        $text = mb_strtolower((string) $text);
+
+        return trim(preg_replace('/[^\p{L}\p{N}]+/u', ' ', $text));
+    }
+
+    /**
+     * Find an item the user can see that is the same article as this entry. Identifiers decide first (DOI, PMID,
+     * arXiv number, ISBN of a book, any other identifier); without a match, the same title, year and first author do.
+     *
+     * @param array $entry Parsed entry.
+     * @return int|null Item id.
+     */
+    private function findExistingItem(array $entry): ?int {
+
+        $C = ItemMeta::COLUMN;
+        $visible = $this->visibleItems();
+        $types = (array) ($entry[$C['UID_TYPES']] ?? []);
+        $uids = (array) ($entry[$C['UIDS']] ?? []);
+
+        foreach ($uids as $i => $uid) {
+
+            $type = (string) ($types[$i] ?? '');
+            $uid = trim((string) $uid);
+
+            if ($type === '' || $uid === '') {
+
+                continue;
+            }
+
+            switch ($type) {
+
+                case 'DOI':
+                    $this->db_main->run("SELECT item_id FROM uids WHERE uid_type = 'DOI' AND uid = ? AND item_id IN ($visible) LIMIT 1", [$uid]);
+                    $found = $this->db_main->getResult();
+
+                    if (!$found) {
+
+                        $this->db_main->run("SELECT item_id FROM uids WHERE uid_type = 'DOI' AND lower(uid) = ? AND item_id IN ($visible) LIMIT 1", [strtolower($uid)]);
+                        $found = $this->db_main->getResult();
+                    }
+
+                    break;
+
+                case 'ARXIV':
+                    // 1706.03762, 1706.03762v7 and a hyphenated old-style number are the same paper.
+                    $base = preg_replace('/v\d+$/', '', $uid);
+                    $like = addcslashes($base, '%_\\') . '%';
+                    $this->db_main->run("SELECT item_id, uid FROM uids WHERE uid_type = 'ARXIV' AND uid LIKE ? ESCAPE '\\' AND item_id IN ($visible)", [$like]);
+                    $found = false;
+
+                    foreach ($this->db_main->getResultRows() as $row) {
+
+                        if (preg_replace('/v\d+$/', '', $row['uid']) === $base) {
+
+                            $found = $row['item_id'];
+                            break;
+                        }
+                    }
+
+                    break;
+
+                case 'ISBN':
+                    // One ISBN names a whole book, not its chapters.
+                    if (($entry[$C['REFERENCE_TYPE']] ?? '') !== 'book') {
+
+                        continue 2;
+                    }
+
+                    $digits = strtoupper(preg_replace('/[^0-9Xx]/', '', $uid));
+                    $this->db_main->run(
+                        "SELECT u.item_id FROM uids u INNER JOIN items i ON i.id = u.item_id
+                            WHERE u.uid_type = 'ISBN' AND i.reference_type = 'book'
+                            AND upper(replace(replace(u.uid, '-', ''), ' ', '')) = ? AND u.item_id IN ($visible) LIMIT 1",
+                        [$digits]
+                    );
+                    $found = $this->db_main->getResult();
+                    break;
+
+                default:
+                    $this->db_main->run("SELECT item_id FROM uids WHERE uid_type = ? AND uid = ? AND item_id IN ($visible) LIMIT 1", [$type, $uid]);
+                    $found = $this->db_main->getResult();
+            }
+
+            if ($found) {
+
+                return (int) $found;
+            }
+        }
+
+        // Without a shared identifier: the same title, year and first author. All three are required, so an entry
+        // that lacks one of them is never merged on this evidence.
+        $date = (string) ($entry[$C['PUBLICATION_DATE']] ?? '');
+        $title = $this->normalizeText((string) ($entry[$C['TITLE']] ?? ''));
+        $author = $this->normalizeText((string) (($entry[$C['AUTHOR_LAST_NAME']] ?? [])[0] ?? ''));
+
+        if (strlen($date) < 4 || strlen($title) < 10 || $author === '') {
+
+            return null;
+        }
+
+        $year = substr($date, 0, 4);
+
+        foreach ($this->yearIndex($year)[$title . '|' . $author] ?? [] as $id) {
+
+            return $id;
+        }
+
+        return null;
+    }
+
+    /**
+     * Visible items of one publication year, keyed by normalized title and first author.
+     *
+     * @param string $year
+     * @return array
+     */
+    private function yearIndex(string $year): array {
+
+        if (isset($this->dedupe_index[$year])) {
+
+            return $this->dedupe_index[$year];
+        }
+
+        $this->dedupe_index[$year] = [];
 
         $this->db_main->run(
-            "SELECT count(*) FROM uids WHERE uid_type = ? AND uid = ? AND item_id IN ({$this->visibleItems()})",
-            [$type, $uid]
+            "SELECT i.id, i.title, a.last_name
+                FROM items i
+                LEFT JOIN items_authors ia ON ia.item_id = i.id AND ia.position = 1
+                LEFT JOIN authors a ON a.id = ia.author_id
+                WHERE i.publication_date >= ? AND i.publication_date <= ? AND i.id IN ({$this->visibleItems()})",
+            ["$year-01-01", "$year-12-31"]
         );
 
-        return (int) $this->db_main->getResult() > 0;
+        foreach ($this->db_main->getResultRows() as $row) {
+
+            $key = $this->normalizeText((string) $row['title']) . '|' . $this->normalizeText((string) $row['last_name']);
+            $this->dedupe_index[$year][$key][] = (int) $row['id'];
+        }
+
+        return $this->dedupe_index[$year];
+    }
+
+    /**
+     * Make a newly saved item findable by the entries that follow it in the same file.
+     *
+     * @param int $item_id
+     * @param array $entry
+     */
+    private function rememberItem(int $item_id, array $entry): void {
+
+        $C = ItemMeta::COLUMN;
+        $date = (string) ($entry[$C['PUBLICATION_DATE']] ?? '');
+        $year = substr($date, 0, 4);
+
+        // A year that was never looked up is read from the database when it is needed, and will include this item.
+        if (strlen($date) < 4 || isset($this->dedupe_index[$year]) === false) {
+
+            return;
+        }
+
+        $key = $this->normalizeText((string) ($entry[$C['TITLE']] ?? '')) . '|' . $this->normalizeText((string) (($entry[$C['AUTHOR_LAST_NAME']] ?? [])[0] ?? ''));
+        $this->dedupe_index[$year][$key][] = $item_id;
+    }
+
+    /**
+     * Put an existing item into the target projects of an import.
+     *
+     * With no project chosen the importer would file a new item in the Public project. An article that is already
+     * in some other project is not published that way: it is reported as a duplicate and left where it is.
+     *
+     * @param int $item_id
+     * @param array $data Import options, with an optional 'projects' list.
+     * @return array ['linked' => projects it was added to, 'present' => projects that already held it]
+     * @throws Exception
+     */
+    private function linkExistingItem(int $item_id, array $data): array {
+
+        $targets = array_values(array_unique(array_map('intval', (array) ($data['projects'] ?? []))));
+
+        if ($targets === []) {
+
+            return ['linked' => 0, 'present' => 1];
+        }
+
+        $linked = 0;
+        $present = 0;
+
+        foreach ($targets as $project_id) {
+
+            // The same permission as for a new item.
+            $this->assertMayAddToProject($project_id);
+
+            $this->db_main->run('SELECT count(*) FROM projects_items WHERE project_id = ? AND item_id = ?', [$project_id, $item_id]);
+
+            if ((int) $this->db_main->getResult() > 0) {
+
+                $present++;
+                continue;
+            }
+
+            $this->db_main->run('INSERT OR IGNORE INTO projects_items (project_id, item_id) VALUES (?, ?)', [$project_id, $item_id]);
+            $linked++;
+        }
+
+        return ['linked' => $linked, 'present' => $present];
     }
 
     /**
