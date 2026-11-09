@@ -15,7 +15,7 @@ class CitationView extends TextView {
      */
     public function main(array $data): string {
 
-        $this->title("{$this->lang->t9n('Citation styles')} - I, Librarian");
+        $this->title("{$this->lang->t9n('Citation styles')} - Offprintless");
 
         $this->head();
 

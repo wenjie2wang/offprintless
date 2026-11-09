@@ -26,7 +26,7 @@ class RssView extends TextView {
         $atom->appendChild($feed);
 
         // Feed title.
-        $title = $atom->createElement('title', 'I, Librarian');
+        $title = $atom->createElement('title', 'Offprintless');
         $feed->appendChild($title);
 
         // Feed ID.
@@ -46,7 +46,7 @@ class RssView extends TextView {
 
         // Authors.
         $author = $atom->createElement('author');
-        $name = $atom->createElement('name', 'I, Librarian');
+        $name = $atom->createElement('name', 'Offprintless');
         $author->appendChild($name);
         $feed->appendChild($author);
 

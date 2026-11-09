@@ -125,6 +125,17 @@ final class Patents extends ExternalDatabase implements ExternalDatabaseInterfac
         return [];
     }
 
+    /**
+     * Search Google Patents (unofficial JSON endpoint, no key). Terms: "q" (keywords), "inventor", "assignee".
+     *
+     * @param array $terms [[field => term], ...]
+     * @param int $start 1-based starting record.
+     * @param int $rows
+     * @param array|null $filters
+     * @param string|null $sort "new" or "old"; empty is relevance.
+     * @return array
+     * @throws Exception|GuzzleException
+     */
     public function search(
         array  $terms,
         int    $start,
@@ -133,13 +144,118 @@ final class Patents extends ExternalDatabase implements ExternalDatabaseInterfac
         string $sort = null
     ): array {
 
-        return [];
+        $labels = ['q' => 'Terms', 'inventor' => 'Inventor', 'assignee' => 'Assignee'];
+        $params = [];
+        $search_name = '';
+
+        foreach ($terms as $term) {
+
+            $name = key($term);
+            $value = current($term);
+
+            if (isset($labels[$name]) === false) {
+
+                continue;
+            }
+
+            $params[$name] = $value;
+            $search_name .= $labels[$name] . ": $value ";
+        }
+
+        if ($params === []) {
+
+            return ['found' => 0, 'items' => [], 'search_name' => ''];
+        }
+
+        $params['num'] = max(10, min($rows, 100));
+        $params['page'] = (int) floor(max(0, $start - 1) / $params['num']);
+
+        if (in_array($sort, ['new', 'old'], true)) {
+
+            $params['sort'] = $sort;
+        }
+
+        $this->cache->context('searches');
+        $key = $this->cache->key(__METHOD__ . serialize($params));
+        $items = $this->cache->get($key);
+
+        if (empty($items)) {
+
+            try {
+
+                $this->queue->wait('patents');
+                $response = $this->client->get(
+                    'https://patents.google.com/xhr/query?exp=&url=' . rawurlencode(http_build_query($params))
+                );
+                $this->queue->release('patents');
+
+                $items = $this->formatMetadata(json_decode($response->getBody()->getContents(), true) ?? []);
+                $this->cache->set($key, $items, 86400);
+
+            } catch (BadResponseException $e) {
+
+                $this->queue->release('patents');
+                throw new Exception($e->getCode() === 429 ? 'Patent server is busy, try again later' : 'Patent server error');
+            }
+        }
+
+        $items['search_name'] = $search_name;
+
+        return $items;
     }
 
+    /**
+     * Format a Google Patents search result.
+     *
+     * @param array|string $json Decoded JSON.
+     * @return array
+     */
     public function formatMetadata($json): array {
 
-        return [];
+        $results = $json['results'] ?? [];
+        $output = [
+            'found' => (int) ($results['total_num_results'] ?? 0),
+            'items' => []
+        ];
+
+        foreach (($results['cluster'][0]['result'] ?? []) as $result) {
+
+            $patent = $result['patent'] ?? [];
+            $number = $patent['publication_number'] ?? '';
+
+            if ($number === '' || empty($patent['title'])) {
+
+                continue;
+            }
+
+            $item = [];
+            $item[ItemMeta::COLUMN['TITLE']] = html_entity_decode(strip_tags($patent['title']), ENT_QUOTES | ENT_HTML5);
+            $item[ItemMeta::COLUMN['ABSTRACT']] = html_entity_decode(strip_tags($patent['snippet'] ?? ''), ENT_QUOTES | ENT_HTML5);
+            $item[ItemMeta::COLUMN['PUBLICATION_DATE']] = $patent['publication_date'] ?? ($patent['priority_date'] ?? null);
+            $item[ItemMeta::COLUMN['AFFILIATION']] = $patent['assignee'] ?? null;
+            $item[ItemMeta::COLUMN['UID_TYPES']] = ['PAT'];
+            $item[ItemMeta::COLUMN['UIDS']] = [$number];
+            $item[ItemMeta::COLUMN['URLS']] = ['https://patents.google.com/patent/' . rawurlencode($number)];
+
+            // Inventors come as one string; there is no reliable split into first and last names.
+            $inventor = trim((string) ($patent['inventor'] ?? ''));
+
+            if ($inventor !== '') {
+
+                $parts = explode(' ', $inventor);
+                $item[ItemMeta::COLUMN['AUTHOR_LAST_NAME']][] = array_pop($parts);
+                $item[ItemMeta::COLUMN['AUTHOR_FIRST_NAME']][] = join(' ', $parts);
+            }
+
+            $item[ItemMeta::COLUMN['REFERENCE_TYPE']] = ItemMeta::TYPE['PATENT'];
+            $item[ItemMeta::COLUMN['BIBTEX_TYPE']] = ItemMeta::BIBTEX_TYPE['PATENT'];
+
+            $output['items'][] = $item;
+        }
+
+        return $output;
     }
+
 
     /**
      * Format metadata from HTML Google page.

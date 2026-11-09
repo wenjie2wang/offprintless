@@ -56,6 +56,7 @@ final class AppSettings {
      */
     public array $default_global_settings = [
         'api_crossref'        => '',
+        'api_elsevier'        => '',
         'api_ieee'            => '',
         'api_nasa'            => '',
         'api_ncbi'            => '',
@@ -207,7 +208,7 @@ final class AppSettings {
             if (!isset($this->settings['user'][$name])) {
 
                 // A new setting, sign the user out.
-                throw new Exception("you will be signed out to experience upgraded I, Librarian", 401);
+                throw new Exception("you will be signed out to experience upgraded Offprintless", 401);
             }
 
             return $this->settings['user'][$name];
@@ -261,7 +262,7 @@ final class AppSettings {
                     unlink(IL_TEMP_PATH . DIRECTORY_SEPARATOR . 'settings.json');
                 }
 
-                throw new Exception("you will be signed out to experience upgraded I, Librarian", 401);
+                throw new Exception("you will be signed out to experience upgraded Offprintless", 401);
             }
 
             return $this->settings['global'][$name];

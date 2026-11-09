@@ -50,13 +50,34 @@ EOT;
      * @param $user_id
      * @param $item_id
      */
-    public function itemOpened($user_id, $item_id): void {}
+    public function itemOpened($user_id, $item_id): void {
+
+        $this->db_log->run('INSERT INTO opens (item_id, user_id) VALUES (?, ?)', [$item_id, $user_id]);
+    }
 
     /**
      * @param $user_id
      * @param $item_id
      */
-    public function pdfDownloaded($user_id, $item_id): void {}
+    public function pdfDownloaded($user_id, $item_id): void {
+
+        $this->db_log->run('INSERT INTO downloads (item_id, user_id) VALUES (?, ?)', [$item_id, $user_id]);
+    }
+
+    /**
+     * Record an edit. Only the names of the changed fields are kept, never their values.
+     *
+     * @param $user_id
+     * @param $item_id
+     * @param string[] $fields
+     */
+    public function itemEdited($user_id, $item_id, array $fields): void {
+
+        $this->db_log->run(
+            'INSERT INTO edits (item_id, user_id, changes) VALUES (?, ?, ?)',
+            [$item_id, $user_id, json_encode(array_values($fields))]
+        );
+    }
 
     /**
      * Destructor closes db connection.

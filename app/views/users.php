@@ -356,7 +356,7 @@ class UsersView extends TextView {
 
         $first_line = sprintf($this->lang->t9n('Your account at %s was created with a username'), IL_BASE_URL);
 
-        $subject = rawurlencode($this->lang->t9n('New I, Librarian account'));
+        $subject = rawurlencode($this->lang->t9n('New Offprintless account'));
 
         $body = rawurlencode(<<<MESSAGE
 {$this->lang->t9n('Hello')} {$user['username']}:
@@ -401,7 +401,7 @@ MESSAGE;
 
         $first_line = sprintf($this->lang->t9n('Your account password at %s was reset to'), IL_BASE_URL);
 
-        $subject = rawurlencode($this->lang->t9n('I, Librarian password reset'));
+        $subject = rawurlencode($this->lang->t9n('Offprintless password reset'));
 
         $body = rawurlencode(<<<MESSAGE
 {$this->lang->t9n('Hello')} {$user['username']}:

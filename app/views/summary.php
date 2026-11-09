@@ -472,7 +472,7 @@ EOT;
             <table class="table {$dark_table} table-borderless table-sm w-100 m-0">
                 <tr>
                     <td class="px-4">
-                        <b>I, Librarian</b><br>
+                        <b>Offprintless</b><br>
                         {$item['id']}
                     </td>
                     <td class="px-4">

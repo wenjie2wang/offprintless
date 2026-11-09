@@ -30,7 +30,12 @@ class LogsController extends AppController {
      */
     public function mainAction(): string {
 
+        $days = isset($this->get['days']) ? (int) $this->get['days'] : 30;
+
+        $model = new LogsModel($this->di);
+        $report = $model->report($days);
+
         $view = new LogsView($this->di);
-        return $view->main();
+        return $view->main($report);
     }
 }

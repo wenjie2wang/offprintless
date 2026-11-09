@@ -2,10 +2,10 @@
 
 ### Linux manual installation
 1. If you did not use the DEB package, make sure you have installed these packages from repositories:
-  - Either of these web servers is recommended (you may run *I, Librarian* with any web server)
+  - Either of these web servers is recommended (you may run *Offprintless* with any web server)
     * **apache2 (may be named httpd)**
     * **nginx**
-  - PHP (*I, Librarian* requires PHP 7.2+)
+  - PHP (*Offprintless* requires PHP 7.2+)
     * For Apache, **php** and **libapache2-mod-php**
     * For Nginx, **php-fpm** is recommended.
   - PHP Extensions

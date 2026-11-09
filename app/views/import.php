@@ -267,6 +267,16 @@ EOT
             $el->option(ItemMeta::UID_TYPE['PAT'], 'PAT');
         }
 
+        if ($this->app_settings->getUser('connect_sciencedirect') === '1') {
+
+            $el->option(ItemMeta::UID_TYPE['DIRECT'], 'DIRECT');
+        }
+
+        if ($this->app_settings->getUser('connect_scopus') === '1') {
+
+            $el->option(ItemMeta::UID_TYPE['SCOPUS'], 'SCOPUS');
+        }
+
         if ($this->app_settings->getUser('connect_pubmed') === '1') {
 
             $el->option(ItemMeta::UID_TYPE['PMID'], 'PMID');

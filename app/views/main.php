@@ -97,7 +97,7 @@ STYLE;
 <div
     class="bg-primary text-white text-center py-2 w-100"
     style="font-family: monospace;max-width: 400px;margin:auto;font-size: 20px;">
-    I, Librarian Free
+    Offprintless
 </div>
 HTML;
 

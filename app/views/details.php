@@ -50,7 +50,7 @@ class DetailsView extends TextView {
 <i class="text-capitalize">{$this->lang->t9n('installed')}</i>
 HTML
         , 'd-flex justify-content-between py-2');
-        $el->div("I, Librarian <span>{$details['I, Librarian']['present']}</span>", 'd-flex justify-content-between py-2');
+        $el->div("Offprintless <span>{$details['Offprintless']['present']}</span>", 'd-flex justify-content-between py-2');
         $el->div("PHP ({$details['PHP']['required']}+) $php_required", 'd-flex justify-content-between py-2');
         $el->div("SQLite ({$details['SQLite']['required']}+) $sqlite_required", 'd-flex justify-content-between py-2');
         $versions = $el->render();

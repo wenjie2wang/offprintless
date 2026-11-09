@@ -93,7 +93,7 @@ abstract class TextView extends View {
         }
 
         // Title.
-        $this->title = 'I, Librarian';
+        $this->title = 'Offprintless';
     }
 
     /**

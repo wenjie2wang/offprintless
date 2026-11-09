@@ -4279,6 +4279,8 @@ class ImportUidView extends View {
             $('#new-uid-type').val('PMID');
         } else if (/^ieee:/i.test(uidVal) === true) {
             $('#new-uid-type').val('IEEE');
+        } else if (/^(scopus:|2-s2\.0-)/i.test(uidVal) === true) {
+            $('#new-uid-type').val('SCOPUS');
         } else if (/^arxiv:/i.test(uidVal) === true) {
             $('#new-uid-type').val('ARXIV');
         } else if (/^[0-9]{4}.{14}[A-Z]/.test(uidVal) === true) {
@@ -4497,6 +4499,27 @@ class ImportUidView extends View {
                         $('.import-wizard-uid').html('Record found:<h5><a href="' + item.urls[0] + '" target="_blank">'
                             + item.title + '</a></h5>');
                         $('.uploadable-url').val(item.urls[1] || '');
+                        $('#metadata').val(JSON.stringify(item));
+                        $('#fetch-record').addClass('d-none');
+                        $('#upload-form').find(':submit, .reload-button').removeClass('d-none');
+                        $('#phase-2').removeClass('d-none');
+                    }
+                });
+                break;
+            case 'SCOPUS':
+            case 'DIRECT':
+                let elsId = uid.replace(/(scopus|direct|sciencedirect):\s?/i, '');
+                $.when(model.load({
+                    url: window.IL_BASE_URL + 'index.php/' + ($('#new-uid-type').val() === 'SCOPUS' ? 'scopus' : 'sciencedirect') + '/fetch',
+                    data: {'uid': elsId}
+                })).done(function (response) {
+                    let item = (response.items || [])[0];
+                    if (typeof item === 'undefined' || typeof item.title === 'undefined') {
+                        $('#uid-message').removeClass('d-none').addClass('d-flex');
+                        $('#fetch-record').addClass('d-none');
+                        $('#upload-form').find(':submit, .reload-button').removeClass('d-none');
+                    } else {
+                        $('.import-wizard-uid').html('Record found:<h5></h5>').find('h5').text(item.title);
                         $('#metadata').val(JSON.stringify(item));
                         $('#fetch-record').addClass('d-none');
                         $('#upload-form').find(':submit, .reload-button').removeClass('d-none');
@@ -4762,6 +4785,9 @@ views.crossrefsearch = new ExternalSearchView();
 views.pubmedsearch = new ExternalSearchView();
 views.pmcsearch = new ExternalSearchView();
 views.nasasearch = new ExternalSearchView();
+views.scopussearch = new ExternalSearchView();
+views.sciencedirectsearch = new ExternalSearchView();
+views.patentssearch = new ExternalSearchView();
 
 class GlobalSettingsMainView extends View {
     constructor() {

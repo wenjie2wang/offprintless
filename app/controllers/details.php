@@ -30,7 +30,7 @@ class DetailsController extends AppController {
 
         // Versions.
 
-        $details['I, Librarian'] = [
+        $details['Offprintless'] = [
             'present'  => IL_VERSION,
             'required' => ''
         ];

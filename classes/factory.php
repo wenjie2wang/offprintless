@@ -228,6 +228,16 @@ final class Factory {
             return new \Librarian\External\Nasaads($this->di, $key);
         });
 
+        $this->di->set('Scopus', function ($key) {
+
+            return new \Librarian\External\Scopus($this->di, $key);
+        });
+
+        $this->di->set('Sciencedirect', function ($key) {
+
+            return new \Librarian\External\Sciencedirect($this->di, $key);
+        });
+
         $this->di->set('Patents', function () {
 
             return new \Librarian\External\Patents($this->di);

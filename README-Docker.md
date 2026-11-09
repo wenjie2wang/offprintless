@@ -1,4 +1,4 @@
-# *I, Librarian* in Docker
+# *Offprintless* in Docker
 
 ## Prepare permanent storage directory
 
@@ -6,7 +6,7 @@
 mkdir -p /var/www/i-librarian-free/library/data
 chown -R 33:33 /var/www/i-librarian-free/library/data
 ```
-User 33:33 is the user/group ID (UID/GID) that *I, Librarian* runs as. In an unlikely case of a conflict, you can set
+User 33:33 is the user/group ID (UID/GID) that *Offprintless* runs as. In an unlikely case of a conflict, you can set
 the directory permissions to 0777 instead.
 
 ## Prepare config file
@@ -56,15 +56,15 @@ docker compose up -d
 
 ## Access
 
-*I, Librarian* now runs at 127.0.0.1:9050. You can use the local address directly, or via reverse proxy. For instance, using Caddy:
+*Offprintless* now runs at 127.0.0.1:9050. You can use the local address directly, or via reverse proxy. For instance, using Caddy:
 
-* access *I, Librarian* at https://library.example.com. Here, `library` subdomain is just an example. Use whatever you want.
+* access *Offprintless* at https://library.example.com. Here, `library` subdomain is just an example. Use whatever you want.
 ```Caddyfile
 library.example.com {
     reverse_proxy 127.0.0.1:9050
 }
 ```
-* alternatively, to access *I, Librarian* on a `library` URL path at https://example.com/library.  Here, `library` path is literal.
+* alternatively, to access *Offprintless* on a `library` URL path at https://example.com/library.  Here, `library` path is literal.
 
 ```Caddyfile
 example.com {

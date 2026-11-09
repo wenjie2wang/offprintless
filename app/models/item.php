@@ -863,6 +863,14 @@ EOT;
             throw new Exception('this item does not exist', 404);
         }
 
+        // Activity log: remember the old values of the scalar fields, to record which ones changed.
+        $this->db_main->run(
+            'SELECT title, publication_date, volume, issue, pages, abstract, affiliation, publisher, place_published,
+                    reference_type, bibtex_type, urls FROM items WHERE id = ?',
+            [$item['id']]
+        );
+        $old_row = $this->db_main->getResultRow() ?: [];
+
         // Publication titles.
         $primary_title_id = null;
 
@@ -993,6 +1001,32 @@ EOT;
 
         // Insert item.
         $this->db_main->run($sql_item, $columns);
+
+        // Activity log: names of the fields that changed (not their values).
+        $changed = [];
+        $new_values = [
+            'title' => $item[ItemMeta::COLUMN['TITLE']] ?? null,
+            'publication_date' => $item[ItemMeta::COLUMN['PUBLICATION_DATE']] ?? null,
+            'volume' => $item[ItemMeta::COLUMN['VOLUME']] ?? null,
+            'issue' => $item[ItemMeta::COLUMN['ISSUE']] ?? null,
+            'pages' => $item[ItemMeta::COLUMN['PAGES']] ?? null,
+            'abstract' => $item[ItemMeta::COLUMN['ABSTRACT']] ?? null,
+            'affiliation' => $item[ItemMeta::COLUMN['AFFILIATION']] ?? null,
+            'publisher' => $item[ItemMeta::COLUMN['PUBLISHER']] ?? null,
+            'place_published' => $item[ItemMeta::COLUMN['PLACE_PUBLISHED']] ?? null,
+            'reference_type' => $item[ItemMeta::COLUMN['REFERENCE_TYPE']] ?? null,
+            'bibtex_type' => $item[ItemMeta::COLUMN['BIBTEX_TYPE']] ?? null,
+        ];
+
+        foreach ($new_values as $field => $value) {
+
+            if ((string) ($old_row[$field] ?? '') !== (string) ($value ?? '')) {
+
+                $changed[] = $field;
+            }
+        }
+
+        $this->di->getShared('Logger')->itemEdited($this->user_id, (int) $item['id'], $changed);
 
         // UIDs.
 

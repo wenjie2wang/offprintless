@@ -141,6 +141,18 @@ class ItemController extends AppController {
                     $result = $model->search([['DOI' => $this->post['uid']]], 0);
                     break;
 
+                case 'scopus':
+                    $api_key = $this->app_settings->apiKey('elsevier', $this->server);
+                    $model = $this->di->getShared('Scopus', $api_key);
+                    $result = $model->fetch($this->post['uid']);
+                    break;
+
+                case 'sciencedirect':
+                    $api_key = $this->app_settings->apiKey('elsevier', $this->server);
+                    $model = $this->di->getShared('Sciencedirect', $api_key);
+                    $result = $model->fetch($this->post['uid']);
+                    break;
+
                 case 'nasa':
                     /** @var Nasaads $model */
                     $api_key = $this->app_settings->apiKey('nasa', $this->server);

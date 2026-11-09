@@ -452,7 +452,7 @@ class SettingsView extends TextView {
         $el->id('pdf_viewer_internal');
         $el->name('settings[pdf_viewer]');
         $el->value('internal');
-        $el->label("<i>I, Librarian</i> {$this->lang->t9n('PDF viewer')}");
+        $el->label("<i>Offprintless</i> {$this->lang->t9n('PDF viewer')}");
 
         if ($user_settings['pdf_viewer'] === 'internal') {
 
@@ -913,7 +913,7 @@ class SettingsView extends TextView {
         $el->id('connect-patents');
         $el->name('settings[connect_patents]');
         $el->value('1');
-        $el->label('Patents (Pro only)');
+        $el->label('Patents');
         $el->hint('Patent database contains data on more than 110 million patent documents from around the world.');
 
         if ($user_settings['connect_patents'] === '1') {
@@ -970,7 +970,7 @@ class SettingsView extends TextView {
         $el->id('connect-sciencedirect');
         $el->name('settings[connect_sciencedirect]');
         $el->value('1');
-        $el->label('ScienceDirect (Pro only)');
+        $el->label('ScienceDirect');
         $el->hint('ScienceDirect is Elsevier\'s database containing over over 12 million pieces of content from 3,500 academic journals and 34,000 e-books.');
 
         if ($user_settings['connect_sciencedirect'] === '1') {
@@ -989,7 +989,7 @@ class SettingsView extends TextView {
         $el->id('connect-scopus');
         $el->name('settings[connect_scopus]');
         $el->value('1');
-        $el->label('Scopus (Pro only)');
+        $el->label('Scopus');
         $el->hint('Scopus is Elsevier\'s citation database containing over 69 million documents in life, health, physical and social sciences.');
 
         if ($user_settings['connect_scopus'] === '1') {
@@ -1826,6 +1826,23 @@ HTML
         if (!empty($settings['api_ieee'])) {
 
             $el->value($settings['api_ieee']);
+        }
+
+        $options_right .= $el->render();
+
+        $el = null;
+
+        /** @var Bootstrap\Input $el */
+        $el = $this->di->get('Input');
+
+        $el->id('api-elsevier');
+        $el->name('settings[api_elsevier]');
+        $el->label('Elsevier API key (Scopus and ScienceDirect)');
+        $el->hint('Get an API key from <a href="https://dev.elsevier.com/">Elsevier</a>.');
+
+        if (!empty($settings['api_elsevier'])) {
+
+            $el->value($settings['api_elsevier']);
         }
 
         $options_right .= $el->render();

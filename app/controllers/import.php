@@ -242,6 +242,18 @@ class ImportController extends AppController {
                     $result = $model->search([['DOI' => $doi]], 0);
                     break;
 
+                case 'scopus':
+                    $api_key = $this->app_settings->apiKey('elsevier', $this->server);
+                    $model = $this->di->getShared('Scopus', $api_key);
+                    $result = $model->fetch($doi);
+                    break;
+
+                case 'sciencedirect':
+                    $api_key = $this->app_settings->apiKey('elsevier', $this->server);
+                    $model = $this->di->getShared('Sciencedirect', $api_key);
+                    $result = $model->fetch($doi);
+                    break;
+
                 case 'nasa':
                     /** @var Nasaads $model */
                     $api_key = $this->app_settings->apiKey('nasa', $this->server);

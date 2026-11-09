@@ -930,7 +930,7 @@ EOT;
             // Add notes.
             $note_outer = '<!DOCTYPE html><html lang="en" style="width:100%;height:100%"><head>
                     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-                    <title>I, Librarian - Notes</title></head><body>';
+                    <title>Offprintless - Notes</title></head><body>';
 
             $sql = <<<'EOT'
 SELECT users.username, item_notes.note

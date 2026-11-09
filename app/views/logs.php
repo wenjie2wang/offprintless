@@ -9,10 +9,11 @@ use Librarian\Mvc\TextView;
 class LogsView extends TextView {
 
     /**
+     * @param array $report From LogsModel::report().
      * @return string
      * @throws Exception
      */
-    public function main(): string {
+    public function main(array $report): string {
 
         $this->title($this->lang->t9n('Logs'));
 
@@ -29,29 +30,88 @@ class LogsView extends TextView {
 
         $el = null;
 
-        /** @var Bootstrap\Alert $el */
-        $el = $this->di->get('Alert');
+        $days = (int) $report['days'];
+        $base = IL_BASE_URL . 'index.php#logs/main?days=';
+        $links = [];
 
-        $el->context('danger');
-        $el->html(<<<ALERT
-            User activity logs are available in <i>I, Librarian Pro</i> only. <a href="https://i-librarian.net">Upgrade now</a>
-ALERT
-        );
-        $alert = $el->render();
+        foreach ([7 => '7 days', 30 => '30 days', 90 => '90 days', 365 => 'year'] as $d => $label) {
 
-        $el = null;
+            $links[] = $d === $days ? "<b>{$this->lang->t9n($label)}</b>" : "<a href=\"{$base}{$d}\">{$this->lang->t9n($label)}</a>";
+        }
 
-        /** @var Bootstrap\Row $el */
-        $el = $this->di->get('Row');
+        $window = '<p>' . $this->lang->t9n('Period') . ': ' . join(' &middot; ', $links) . '</p>';
 
-        $el->column($alert, 'col-xl-6 offset-xl-3');
-        $row = $el->render();
+        // Per-user totals.
+        /** @var Bootstrap\Table $el */
+        $el = $this->di->get('Table');
 
-        $el = null;
-
-        $this->append([
-            'html' => $bc . $row
+        $el->addClass('table-sm');
+        $table = $el->head([
+            [$this->lang->t9n('User')],
+            [$this->lang->t9n('Items opened')],
+            [$this->lang->t9n('PDFs downloaded')],
+            [$this->lang->t9n('Pages read')],
+            [$this->lang->t9n('Edits')]
         ]);
+
+        foreach ($report['users'] as $user) {
+
+            $table .= $el->bodyRow([
+                [$user['name']],
+                [(int) $user['opens']],
+                [(int) $user['downloads']],
+                [(int) $user['pages']],
+                [(int) $user['edits']]
+            ]);
+        }
+
+        $users_table = $el->render();
+        $el = null;
+
+        /** @var Bootstrap\Card $el */
+        $el = $this->di->get('Card');
+
+        $el->addClass('mb-3');
+        $el->header("<b>{$this->lang->t9n('Activity per user')}</b>", 'text-uppercase');
+        $el->body($window . $users_table);
+        $users_card = $el->render();
+        $el = null;
+
+        // Recent events.
+        /** @var Bootstrap\Table $el */
+        $el = $this->di->get('Table');
+
+        $el->addClass('table-sm');
+        $table = $el->head([
+            [$this->lang->t9n('Time')],
+            [$this->lang->t9n('User')],
+            [$this->lang->t9n('Action')],
+            [$this->lang->t9n('Item')]
+        ]);
+
+        foreach ($report['recent'] as $event) {
+
+            $table .= $el->bodyRow([
+                [$event['created']],
+                [$event['name']],
+                [$this->lang->t9n($event['kind'])],
+                [$event['title']]
+            ]);
+        }
+
+        $recent_table = $el->render();
+        $el = null;
+
+        /** @var Bootstrap\Card $el */
+        $el = $this->di->get('Card');
+
+        $el->addClass('mb-3');
+        $el->header("<b>{$this->lang->t9n('Recent activity')}</b>", 'text-uppercase');
+        $el->body($recent_table);
+        $recent_card = $el->render();
+        $el = null;
+
+        $this->append(['html' => $bc . $users_card . $recent_card]);
 
         return $this->send();
     }

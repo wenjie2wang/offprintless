@@ -678,4 +678,172 @@ HTML;
 
         return $links;
     }
+
+    /**
+     * A simple external-database search page: rows of field + terms, optional sorting, save-search box, and the
+     * list of saved searches.
+     *
+     * @param string $label Database name, e.g. "Scopus".
+     * @param string $slug Route name, e.g. "scopus".
+     * @param array $fields [field => label]
+     * @param array $preselected Field for each of the term rows.
+     * @param array $sorting [value => label]; the first is the default. Empty for none.
+     * @param array $searches Saved searches.
+     * @param string $note Optional HTML note above the form.
+     * @return string
+     * @throws Exception
+     */
+    protected function simpleSearchPage(
+        string $label,
+        string $slug,
+        array $fields,
+        array $preselected,
+        array $sorting,
+        array $searches,
+        string $note = ''
+    ): string {
+
+        $this->title("$label {$this->lang->t9n('search-NOUN')}");
+
+        $this->head();
+
+        /** @var Bootstrap\Breadcrumb $el */
+        $el = $this->di->get('Breadcrumb');
+
+        $el->style('margin: 0 -15px');
+        $el->addClass('bg-transparent');
+        $el->item('IL', '#dashboard');
+        $el->item("$label " . $this->lang->t9n('search-NOUN'));
+        $bc = $el->render();
+
+        $el = null;
+
+        $rows = '';
+
+        foreach ($preselected as $i => $selected_field) {
+
+            /** @var Bootstrap\Select $el */
+            $el = $this->di->get('Select');
+
+            $el->groupClass('col-sm-3');
+            $el->name("search_type[$i]");
+            $el->label($this->lang->t9n('Field'));
+            $el->id("parameter-" . ($i + 1));
+
+            foreach ($fields as $field => $description) {
+
+                $el->option($this->lang->t9n($description), $field, $field === $selected_field);
+            }
+
+            $select = $el->render();
+
+            $el = null;
+
+            /** @var Bootstrap\Input $el */
+            $el = $this->di->get('Input');
+
+            $el->id('value-' . ($i + 1));
+            $el->groupClass('col-sm-9');
+            $el->name("search_query[$i]");
+            $el->label($this->lang->t9n('Terms'));
+            $input = $el->render();
+
+            $el = null;
+
+            $rows .= "<div class=\"form-row\">$select $input</div>";
+        }
+
+        $sort_html = '';
+
+        if ($sorting !== []) {
+
+            $n = 1;
+
+            foreach ($sorting as $value => $description) {
+
+                /** @var Bootstrap\Input $el */
+                $el = $this->di->get('Input');
+
+                $el->type('radio');
+                $el->id("sorting-$n");
+                $el->name('sort');
+                $el->inline(true);
+                $el->value($value);
+                $el->label($this->lang->t9n($description));
+
+                if ($n === 1) {
+
+                    $el->checked('checked');
+                }
+
+                $sort_html .= $el->render();
+
+                $el = null;
+                $n++;
+            }
+
+            $sort_html = "<div class=\"mb-3\"><b>{$this->lang->t9n('Sorting')}</b><br>$sort_html</div>";
+        }
+
+        /** @var Bootstrap\Button $el */
+        $el = $this->di->get('Button');
+
+        $el->type('submit');
+        $el->addClass('my-2 mr-3');
+        $el->context('primary');
+        $el->html($this->lang->t9n('Search-VERB'));
+        $search = $el->render();
+
+        $el = null;
+
+        /** @var Bootstrap\Input $el */
+        $el = $this->di->get('Input');
+
+        $el->type('checkbox');
+        $el->inline(true);
+        $el->id('save-search');
+        $el->name('save_search');
+        $el->value('1');
+        $el->label($this->lang->t9n('save this search for later'));
+        $save_search = $el->render();
+
+        $el = null;
+
+        /** @var Bootstrap\Form $el */
+        $el = $this->di->get('Form');
+
+        $el->method('GET');
+        $el->id("$slug-search-form");
+        $el->addClass('search-form');
+        $el->action("#$slug/search");
+        $el->html("$note $rows $sort_html $search $save_search");
+        $form = $el->render();
+
+        $el = null;
+
+        /** @var Bootstrap\Card $el */
+        $el = $this->di->get('Card');
+
+        $el->addClass('mb-3');
+        $el->body($form, null, 'pt-3');
+        $card = $el->render();
+
+        $el = null;
+
+        $list = $this->sharedSearchList($searches, true);
+
+        /** @var Bootstrap\Row $el */
+        $el = $this->di->get('Row');
+
+        $el->addClass('mb-3');
+        $el->column($card);
+        $el->column($list);
+        $row = $el->render();
+
+        $el = null;
+
+        $this->append(['html' => $bc . $row]);
+
+        return $this->send();
+    }
 }

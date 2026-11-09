@@ -46,7 +46,7 @@ class RegistrationView extends TextView {
             $el->context('success');
             $el->html(
 <<<HTML
-<h4>{$this->lang->t9n('Welcome to')} <i>I,&nbsp;Librarian</i>!</h4>
+<h4>{$this->lang->t9n('Welcome to')} <i>Offprintless</i>!</h4>
 <div class="text-justify">
     {$info1}.
     {$this->lang->t9n('Otherwise, create the first user account below')}.

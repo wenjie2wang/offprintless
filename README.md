@@ -1,4 +1,10 @@
-# I, Librarian Instructions
+# Offprintless Instructions
+
+*Offprintless* is a fork of [I, Librarian Free](https://github.com/mkucej/i-librarian-free) by Martin Kucej, released
+under the same GNU GPL v3 license (see `LICENSE`). It adds a project-based access model (owner, editor, viewer roles
+and a shared Public project) and includes the search connectors and activity logs that I, Librarian reserves for its
+paid edition: Scopus, ScienceDirect, Patents, and user activity logs.
+
 
 ### [Docker installation](README-Docker.md)
 
@@ -45,16 +51,16 @@ Alias /librarian "C:\I, Librarian\public"
 ### First use
 * Note on security: These installation instructions allow access to your library only from local computer
   or an internal network.
-* In order to start *I, Librarian*, open your web browser, and visit:
+* In order to start *Offprintless*, open your web browser, and visit:
   [http://127.0.0.1/librarian](http://127.0.0.1/librarian)
 * Replace `127.0.0.1` with your static IP, or qualified server domain name, if you have either one.
 * Migrate your previous library, or create an account and head to `Administrator > Software details` to see if everything checks fine.
-* You should also check `Administrator > Global settings` to run *I, Librarian* the way you want.
+* You should also check `Administrator > Global settings` to run *Offprintless* the way you want.
 
-**Thank you for using *I, Librarian*!**
+**Thank you for using *Offprintless*!**
 
 ### Un-installation
 * If you used the DEB package, execute the `uninstall.sh` un-installer.
-* Otherwise un-install all programs that you installed solely to use *I, Librarian*.
+* Otherwise un-install all programs that you installed solely to use *Offprintless*.
 * These may include Apache, Nginx, and PHP - using package managers like Apt, Homebrew, or Macports will make this task easier. **Note: You might have other programs using these. Only remove if sure.**
-* Delete *I, Librarian* directory.
+* Delete *Offprintless* directory.

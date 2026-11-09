@@ -45,7 +45,7 @@ Alias /librarian /Users/yourusername/librarian/public
 * You may wish to alter who has access (e.g. to allow access from more IP numbers or domain names) - see the Apache [Authentication and Authorization HOWTO](https://httpd.apache.org/docs/2.4/howto/auth.html) for details.  
 * Restart Apache, by typing `sudo apachectl restart` in Terminal  
 * Install LibreOffice, Tesseract OCR, Ghostscript, and Poppler.  
-* Download *I, Librarian* source for Linux and double-click the file to extract its contents. Rename the extracted directory to 'librarian' and move it to your folder.  
+* Download *Offprintless* source for Linux and double-click the file to extract its contents. Rename the extracted directory to 'librarian' and move it to your folder.  
 
 * Make sure that the directory is accessible to *Others*. Use the `Get Info` dialog of the *Sites* directory to change permissions for *Everyone* to access and read (alternatively, run `chmod o+r ~/Sites/` at the terminal). You also need to make sure *Everyone* has **Execute** permissions for your home directory.
 * Change the owner of the `data` sub-folder to the Apache user (_www for the default install). You can do this at the Terminal: `chown -R _www ~/librarian/data`.)
