@@ -390,6 +390,28 @@ final class ImportUtils {
     }
 
     /**
+     * Plain text from a provider's HTML or JATS/XML snippet: tags removed, entities decoded, paragraphs and lines
+     * joined with single spaces. "A <i>great</i> &amp; real title" becomes "A great & real title".
+     *
+     * @param string|null $html
+     * @return string
+     */
+    public static function htmlToText(?string $html): string {
+
+        if ($html === null || $html === '') {
+
+            return '';
+        }
+
+        // Block-level ends become a space, so "<p>One.</p><p>Two.</p>" does not run together.
+        $html = preg_replace('~</(?:p|div|li|br|h[1-6]|jats:p|jats:title|title)\s*>|<br\s*/?>~i', ' ', $html);
+        $text = strip_tags($html);
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return trim(preg_replace('/\s+/u', ' ', $text));
+    }
+
+    /**
      * Split on a separator that is outside braces.
      *
      * @param string $text

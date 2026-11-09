@@ -76,47 +76,36 @@ final class Crossref extends ExternalDatabase implements ExternalDatabaseInterfa
      */
     public function fetchMultiple(array $dois): array {
 
-        foreach ($dois as $key => $doi) {
+        // One DOI per filter. A comma would split a filter in two, so a DOI that contains one is looked up by its own
+        // address instead.
+        $dois = array_values(array_filter(array_map('trim', $dois), fn($d) => $d !== ''));
 
-            $dois[$key] = "doi:$doi";
+        if ($dois === []) {
+
+            return ['found' => 0, 'items' => []];
         }
 
-        $doi_filter = join(',', $dois);
+        $mailto = '&mailto=' . $this->sanitation->urlquery($this->api_key);
 
-        try {
+        if (count($dois) === 1 && strpos($dois[0], ',') !== false) {
 
-            $this->queue->wait('crossref');
-            $response = $this->client->get($this->url . '?filter=' . $this->sanitation->urlquery($doi_filter) . '&mailto=' . $this->sanitation->urlquery($this->api_key));
-            $this->queue->release('crossref');
+            $url = $this->url . '/' . rawurlencode($dois[0]) . '?' . ltrim($mailto, '&');
 
-            $json = $response->getBody()->getContents();
+        } else {
 
-            return $this->formatMetadata($json);
-
-        } catch (BadResponseException $e) {
-
-            if ($e->getCode() === 429) {
-
-                if ($this->tries < 3) {
-
-                    sleep(1);
-                    $this->tries++;
-                    return $this->fetchMultiple($dois);
-
-                } else {
-
-                    $this->queue->release('crossref');
-                    throw new Exception('Crossref server is busy, try again later');
-                }
-
-            } else {
-
-                return [
-                    'found' => 0,
-                    'items' => []
-                ];
-            }
+            $filter = join(',', array_map(fn($d) => 'doi:' . str_replace(',', '%2C', $d), $dois));
+            $url = $this->url . '?filter=' . $this->sanitation->urlquery($filter) . $mailto;
         }
+
+        $body = $this->providerGet($this->client, 'Crossref', 'crossref', $url);
+
+        // Crossref does not know this DOI.
+        if ($body === null) {
+
+            return ['found' => 0, 'items' => []];
+        }
+
+        return $this->formatMetadata($body);
     }
 
     /**
@@ -290,7 +279,13 @@ final class Crossref extends ExternalDatabase implements ExternalDatabaseInterfa
 
         $items = [];
 
-        $array = Utils::jsonDecode($json, JSON_OBJECT_AS_ARRAY);
+        // An error page or an empty body is not Crossref's JSON.
+        $array = json_decode((string) $json, true);
+
+        if (is_array($array) === false || isset($array['message-type']) === false) {
+
+            throw new Exception('Crossref returned an answer that could not be read', 502);
+        }
 
         if ($array['message-type'] === 'work') {
 
@@ -309,7 +304,7 @@ final class Crossref extends ExternalDatabase implements ExternalDatabaseInterfa
         foreach ($items as $article) {
 
             // Title.
-            $output['items'][$i][ItemMeta::COLUMN['TITLE']] = str_replace(["\r\n", "\n", "\r"], ' ', $article['title'][0] ?? '');
+            $output['items'][$i][ItemMeta::COLUMN['TITLE']] = \Librarian\Import\ImportUtils::htmlToText($article['title'][0] ?? '');
 
             // Get UIDs.
             if (isset($article['alternative-id'])) {
@@ -381,14 +376,30 @@ final class Crossref extends ExternalDatabase implements ExternalDatabaseInterfa
             $output['items'][$i][ItemMeta::COLUMN['ISSUE']] = $article['issue'] ?? '';
             $output['items'][$i][ItemMeta::COLUMN['PAGES']] = $article['page'] ?? '';
 
-            // Authors.
-            if (isset($article['author'])) {
+            // Authors. A person has family and given names; an organization has only "name". A name with only one part
+            // is kept as the last name rather than lost.
+            foreach ((array) ($article['author'] ?? []) as $author) {
 
-                foreach ($article['author'] as $author) {
+                $family = trim((string) ($author['family'] ?? ''));
+                $given = trim((string) ($author['given'] ?? ''));
 
-                    $output['items'][$i][ItemMeta::COLUMN['AUTHOR_LAST_NAME']][] = $author['family'] ?? '';
-                    $output['items'][$i][ItemMeta::COLUMN['AUTHOR_FIRST_NAME']][] = $author['given'] ?? '';
+                if ($family === '' && $given === '') {
+
+                    $family = trim((string) ($author['name'] ?? ''));
+
+                } elseif ($family === '') {
+
+                    $family = $given;
+                    $given = '';
                 }
+
+                if ($family === '') {
+
+                    continue;
+                }
+
+                $output['items'][$i][ItemMeta::COLUMN['AUTHOR_LAST_NAME']][] = $family;
+                $output['items'][$i][ItemMeta::COLUMN['AUTHOR_FIRST_NAME']][] = $given;
             }
 
             // Editors.
@@ -401,19 +412,33 @@ final class Crossref extends ExternalDatabase implements ExternalDatabaseInterfa
                 }
             }
 
-            // Pub date.
-            $date = '';
-            $date_arr = $article['published-print']['date-parts'][0] ?? $article['published-online']['date-parts'][0] ?? [];
-            $year = $date_arr[0] ?? '';
+            // Pub date: the printed date, else the online date, else "issued" (the earliest known).
+            $date = null;
 
-            if (!empty($year)) {
+            foreach (['published-print', 'published-online', 'issued'] as $field) {
 
-                $month = isset($date_arr[1]) ? str_pad($date_arr[1], 2, '0', STR_PAD_LEFT) : '01';
-                $day = isset($date_arr[2]) ? str_pad($date_arr[2], 2, '0', STR_PAD_LEFT) : '01';
-                $date = "$year-$month-$day";
+                $date_arr = $article[$field]['date-parts'][0] ?? [];
+                $year = $date_arr[0] ?? null;
+
+                if (is_numeric($year) && (int) $year > 0) {
+
+                    $month = isset($date_arr[1]) && is_numeric($date_arr[1]) ? str_pad((string) $date_arr[1], 2, '0', STR_PAD_LEFT) : '01';
+                    $day = isset($date_arr[2]) && is_numeric($date_arr[2]) ? str_pad((string) $date_arr[2], 2, '0', STR_PAD_LEFT) : '01';
+                    $date = sprintf('%04d-%s-%s', (int) $year, $month, $day);
+                    break;
+                }
             }
 
-            $output['items'][$i][ItemMeta::COLUMN['PUBLICATION_DATE']] = $date;
+            if ($date !== null) {
+
+                $output['items'][$i][ItemMeta::COLUMN['PUBLICATION_DATE']] = $date;
+            }
+
+            // Abstract (JATS markup).
+            if (!empty($article['abstract'])) {
+
+                $output['items'][$i][ItemMeta::COLUMN['ABSTRACT']] = \Librarian\Import\ImportUtils::htmlToText($article['abstract']);
+            }
 
             // Link.
             $output['items'][$i][ItemMeta::COLUMN['URLS']][] = 'https://doi.org/' . $this->sanitation->urlquery($article['DOI']);

@@ -120,176 +120,146 @@ class ImportController extends AppController {
         // Imported file is saved to temp file.
         $temp_filename = IL_TEMP_PATH . DIRECTORY_SEPARATOR . uniqid('batch_' . true);
         $uploaded_file = $this->getUploadedFile('file');
+        $client_name = null;
 
-        if (!empty($this->post['remote_url'])) {
+        try {
 
-            // Guarded download: every hop is checked, redirects to internal addresses are refused, size is capped.
-            /** @var SafeDownloader $downloader */
-            $downloader = $this->di->get('SafeDownloader');
-            $response = $downloader->download($this->post['remote_url'], $temp_filename, ['cookies' => new CookieJar()]);
+            if (!empty($this->post['remote_url'])) {
 
-            // Client filename.
-            $decorator = new ResponseDecorator($response);
-            $client_name = $decorator->getFilename();
+                // Guarded download: every hop is checked, redirects to internal addresses are refused, size is capped.
+                /** @var SafeDownloader $downloader */
+                $downloader = $this->di->get('SafeDownloader');
+                $response = $downloader->download($this->post['remote_url'], $temp_filename, ['cookies' => new CookieJar()]);
 
-        } elseif(isset($uploaded_file)) {
+                // Client filename.
+                $decorator = new ResponseDecorator($response);
+                $client_name = $decorator->getFilename();
 
-            $client_name = $uploaded_file->getClientFilename();
-            $uploaded_file->moveTo($temp_filename);
-        }
+            } elseif (isset($uploaded_file)) {
 
-        // Extract DOI from PDF.
-        $doi = null;
-        $mime_type = mime_content_type($temp_filename);
+                $client_name = $uploaded_file->getClientFilename();
+                $uploaded_file->moveTo($temp_filename);
 
-        if ($mime_type === 'application/pdf') {
+            } else {
 
-            /** @var Pdf $pdf_obj */
-            $pdf_obj = new Pdf($this->di, $temp_filename);
-            $text_file = $pdf_obj->text();
+                // An empty file is treated by getUploadedFile() as no file at all, so say which it was.
+                $raw = $this->files['file'] ?? null;
 
-            if (is_readable($text_file) === true) {
+                throw new Exception(
+                    $raw !== null && $raw->getError() === UPLOAD_ERR_OK ? 'the file is empty' : 'no file was received',
+                    400
+                );
+            }
 
-                $ft = fopen($text_file, 'r');
+            // Office files and images are converted elsewhere; a PDF is checked and filed by the import model.
+            $mime_type = mime_content_type($temp_filename);
 
-                while (feof($ft) === false) {
+            if ($mime_type !== 'application/pdf') {
 
-                    $line = fgets($ft);
+                if (in_array($mime_type, $this->app_settings->extra_mime_types) === false) {
 
-                    preg_match_all('/10\.\d{4,5}\.?\d*\/\s?[^\/\s]+/ui', $line, $match, PREG_PATTERN_ORDER);
-
-                    if (count($match[0]) > 0) {
-
-                        // First match.
-                        $doi = $match[0][0];
-
-                        // Remove punctuation marks from the end.
-                        if (in_array(substr($doi, -1), ['.', ',', ';']) === true) {
-
-                            $doi = substr($doi, 0, -1);
-                        }
-
-                        // Extract DOI from parentheses.
-                        if (substr($doi, -1) === ')' || substr($doi, -1) === ']') {
-
-                            preg_match_all('/(.)(doi:\s?)?(10\.\d{4,5}\.?\d*\/\s?[^\/\s]+)/ui', $line, $match2, PREG_PATTERN_ORDER);
-
-                            if (substr($doi, -1) === ')' && isset($match2[1][0]) === true && $match2[1][0] === '(') {
-
-                                $doi = substr($doi, 0, -1);
-                            }
-
-                            if (substr($doi, -1) === ']' && isset($match2[1][0]) === true && $match2[1][0] === '[') {
-
-                                $doi = substr($doi, 0, -1);
-                            }
-                        }
-
-                        $doi = str_replace(' ', '', $doi);
-
-                        break;
-                    }
+                    throw new Exception(sprintf(
+                        $this->lang->t9n('only these file types can be imported: %s'),
+                        join(', ', $this->app_settings->extra_file_types) . ', pdf'), 400);
                 }
 
-                fclose($ft);
-                unlink($text_file);
+                throw new Exception('Office files and images cannot be imported without the converter', 415);
             }
 
-        } elseif (in_array($mime_type, $this->app_settings->extra_mime_types) === false) {
+            $model = new ImportModel($this->di);
+            $facts = $model->inspect($temp_filename, $client_name);
+            $doi = $facts['doi'] ?? null;
 
-            throw new Exception(sprintf(
-                $this->lang->t9n('only these file types can be imported: %s'),
-                join(', ', $this->app_settings->extra_file_types) . ', pdf'), 400);
-        }
+            // The file's own DOI decides whether it is the same article as one already in a project; use the
+            // metadata of the chosen provider (Crossref when none) for the title and authors.
+            $data = $this->post;
+            $data = $this->metadataFor($doi, $data);
 
-        // Fetch record metadata.
-        if (!empty($doi) && !empty($this->post['repository'])) {
+            $result = $model->accept($temp_filename, $client_name, $data);
 
-            switch ($this->post['repository']) {
+        } finally {
 
-                case 'xplore':
-                    $api_key = $this->app_settings->apiKey('ieee', $this->server);
-                    /** @var Xplore $model */
-                    $model = $this->di->getShared('Xplore', $api_key);
-                    $result = $model->fetch($doi);
-                    break;
+            foreach ([$temp_filename, $temp_filename . '.db', $temp_filename . '.txt'] as $leftover) {
 
-                case 'pubmed':
-                    /** @var Pubmed $model */
-                    $api_key = $this->app_settings->apiKey('ncbi', $this->server, true);
-                    $model = $this->di->get('Pubmed', $api_key);
-                    $result = $model->search([['AID' => $doi]], 0);
-                    break;
+                if (is_file($leftover) && is_writable($leftover)) {
 
-                case 'pmc':
-                    /** @var Pmc $model */
-                    $api_key = $this->app_settings->apiKey('ncbi', $this->server, true);
-                    $model = $this->di->get('Pmc', $api_key);
-                    $result = $model->search([['DOI' => $doi]], 0);
-                    break;
-
-                case 'scopus':
-                    $api_key = $this->app_settings->apiKey('elsevier', $this->server);
-                    $model = $this->di->getShared('Scopus', $api_key);
-                    $result = $model->fetch($doi);
-                    break;
-
-                case 'sciencedirect':
-                    $api_key = $this->app_settings->apiKey('elsevier', $this->server);
-                    $model = $this->di->getShared('Sciencedirect', $api_key);
-                    $result = $model->fetch($doi);
-                    break;
-
-                case 'nasa':
-                    /** @var Nasaads $model */
-                    $api_key = $this->app_settings->apiKey('nasa', $this->server);
-                    $model = $this->di->get('Nasa', $api_key);
-                    $result = $model->search([['doi' => $doi]], 0);
-                    break;
-
-                default:
-                    $result = [];
+                    unlink($leftover);
+                }
             }
-
-            $metadata = isset($result['items'][0]) ? $result['items'][0] : [];
-            $this->post = $this->post + $metadata;
         }
 
-        if (empty($this->post['title']) && !empty($doi)) {
-
-            // Crossref fallback.
-            $api_key = $this->app_settings->apiKey('crossref', $this->server, true);
-            /** @var Crossref $crossref */
-            $crossref = $this->di->getShared('Crossref', $api_key);
-            $result = $crossref->fetch($doi);
-
-            $metadata = isset($result['items'][0]) ? $result['items'][0] : [];
-            $this->post = $this->post + $metadata;
-        }
-
-        if (empty($this->post['title'])) {
-
-            $this->post['title'] = pathinfo($client_name, PATHINFO_FILENAME);
-        }
-
-        $model = new ItemModel($this->di);
-        $result = $model->save($this->post);
-
-        if (!empty($result['item_id'])) {
-
-            // Open stream for the temp file.
-            $fp = Utils::tryFopen($temp_filename, 'rb');
-            $stream = Utils::streamFor($fp);
-
-            // Save the file.
-            $model = new PdfModel($this->di);
-            $model->save($result['item_id'], $stream, $client_name);
-        }
-
-        unlink($temp_filename);
+        $messages = [
+            'created' => 'new item was saved',
+            'linked'  => 'this PDF was already in the library and was added to this project',
+            'skipped' => 'this PDF is already in this project'
+        ];
 
         $view = new DefaultView($this->di);
-        return $view->main(['info' => "new item was saved"]);
+        return $view->main(['info' => $messages[$result['status']]]);
+    }
+
+    /**
+     * Look up the metadata for a DOI found in a PDF: from the provider the user chose, then Crossref. The user's own
+     * form values win. A provider that is down does not stop the import: the PDF is filed with its file name as title.
+     *
+     * @param string|null $doi
+     * @param array $data
+     * @return array
+     * @throws Exception
+     */
+    private function metadataFor(?string $doi, array $data): array {
+
+        if (empty($doi)) {
+
+            return $data;
+        }
+
+        $result = [];
+
+        try {
+
+            if (!empty($data['repository'])) {
+
+                switch ($data['repository']) {
+
+                    case 'xplore':
+                        $result = $this->di->getShared('Xplore', $this->app_settings->apiKey('ieee', $this->server))->fetch($doi);
+                        break;
+
+                    case 'pubmed':
+                        $result = $this->di->get('Pubmed', $this->app_settings->apiKey('ncbi', $this->server, true))->search([['AID' => $doi]], 0);
+                        break;
+
+                    case 'pmc':
+                        $result = $this->di->get('Pmc', $this->app_settings->apiKey('ncbi', $this->server, true))->search([['DOI' => $doi]], 0);
+                        break;
+
+                    case 'scopus':
+                        $result = $this->di->getShared('Scopus', $this->app_settings->apiKey('elsevier', $this->server))->fetch($doi);
+                        break;
+
+                    case 'sciencedirect':
+                        $result = $this->di->getShared('Sciencedirect', $this->app_settings->apiKey('elsevier', $this->server))->fetch($doi);
+                        break;
+
+                    case 'nasa':
+                        $result = $this->di->get('Nasa', $this->app_settings->apiKey('nasa', $this->server))->search([['doi' => $doi]], 0);
+                        break;
+                }
+            }
+
+            if (empty($result['items'][0]['title'])) {
+
+                $result = $this->di->getShared('Crossref', $this->app_settings->apiKey('crossref', $this->server, true))->fetch($doi);
+            }
+
+        } catch (Exception $exc) {
+
+            // Keep going without metadata. The user can edit the item afterwards.
+            $result = [];
+        }
+
+        return $data + ($result['items'][0] ?? []);
     }
 
     /**

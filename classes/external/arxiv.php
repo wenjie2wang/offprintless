@@ -23,8 +23,6 @@ final class Arxiv extends ExternalDatabase implements ExternalDatabaseInterface 
      */
     private string $url;
 
-    private int $tries = 0;
-
     /**
      * Arxiv constructor.
      *
@@ -71,8 +69,26 @@ final class Arxiv extends ExternalDatabase implements ExternalDatabaseInterface 
      */
     public function fetchMultiple(array $uids): array {
 
+        // "arXiv:1706.03762v7", a pasted abs/pdf link and a bare number are all the same id.
+        $ids = [];
+
+        foreach ($uids as $uid) {
+
+            [$type, $value] = \Librarian\Import\Identifier::parse((string) $uid);
+
+            if ($type === 'ARXIV') {
+
+                $ids[] = $value;
+            }
+        }
+
+        if ($ids === []) {
+
+            return ['found' => 0, 'items' => []];
+        }
+
         $params = [
-            'id_list'     => join(',', $uids),
+            'id_list'     => join(',', $ids),
             'start'       => 0,
             'max_results' => 100
         ];
@@ -80,54 +96,48 @@ final class Arxiv extends ExternalDatabase implements ExternalDatabaseInterface 
         // Try to get records from Cache.
         $this->cache->context('searches');
 
-        $key = $this->cache->key(
-            __METHOD__
-            . serialize($params)
-        );
-
-        // Get items from cache.
+        $key = $this->cache->key(__METHOD__ . serialize($params));
         $items = $this->cache->get($key);
 
         if (empty($items)) {
 
-            try {
-
-                $this->queue->wait('arxiv');
-                $response = $this->client->get($this->url . http_build_query($params));
-                $this->queue->release('arxiv');
-
-                $xml = $response->getBody()->getContents();
-
-                $items = $this->formatMetadata($xml);
-
-                // Hold in Cache for 24h.
-                $this->cache->set($key, $items, 86400);
-
-            } catch (BadResponseException $e) {
-
-                if ($e->getCode() === 429) {
-
-                    if ($this->tries < 3) {
-
-                        sleep(1);
-                        $this->tries++;
-                        return $this->fetchMultiple($uids);
-
-                    } else {
-
-                        $this->queue->release('arxiv');
-                        throw new Exception('arXiv server is busy, try again later');
-                    }
-
-                } else {
-
-                    $this->queue->release('arxiv');
-                    throw new Exception('arXiv server error');
-                }
-            }
+            $items = $this->requestFeed($this->url . http_build_query($params));
+            $this->cache->set($key, $items, 86400);
         }
 
         return $items;
+    }
+
+    /**
+     * Ask arXiv for an Atom feed and read it. An answer that is not a feed (a maintenance page, an empty body) is an
+     * error, not "no results".
+     *
+     * @param string $url
+     * @return array
+     * @throws Exception
+     */
+    private function requestFeed(string $url): array {
+
+        $body = $this->providerGet($this->client, 'arXiv', 'arxiv', $url);
+
+        if ($body === null) {
+
+            return ['found' => 0, 'items' => []];
+        }
+
+        if (stripos(ltrim($body), '<?xml') !== 0 && stripos(ltrim($body), '<feed') !== 0) {
+
+            throw new Exception('arXiv returned an answer that could not be read', 502);
+        }
+
+        try {
+
+            return $this->formatMetadata($body);
+
+        } catch (Exception $e) {
+
+            throw new Exception('arXiv returned an answer that could not be read', 502);
+        }
     }
 
     /**
@@ -302,46 +312,10 @@ final class Arxiv extends ExternalDatabase implements ExternalDatabaseInterface 
 
         if (empty($items)) {
 
-            try {
+            $items = $this->requestFeed($this->url . http_build_query($params));
 
-                $this->queue->wait('arxiv');
-                $response = $this->client->get($this->url . http_build_query($params));
-                $this->queue->release('arxiv');
-
-                $xml = $response->getBody()->getContents();
-
-                $items = $this->formatMetadata($xml);
-
-                // Hold in Cache for 24h.
-                $this->cache->set($key, $items, 86400);
-
-            } catch (BadResponseException $e) {
-
-                if ($e->getCode() === 429) {
-
-                    if ($this->tries < 3) {
-
-                        sleep(1);
-                        $this->tries++;
-                        return $this->search($terms, $start, $rows, $filters, $sort);
-
-                    } else {
-
-                        $this->queue->release('arxiv');
-                        throw new Exception('arXiv server is busy, try again later');
-                    }
-
-                } else {
-
-                    // Return empty result.
-                    $items = [
-                        'found'       => 0,
-                        'items'       => [],
-                        'search_name' => $human_readable . " • sort: $sort"
-                    ];
-                    return $items;
-                }
-            }
+            // Hold in Cache for 24h.
+            $this->cache->set($key, $items, 86400);
         }
 
         // Paging.
@@ -389,17 +363,23 @@ final class Arxiv extends ExternalDatabase implements ExternalDatabaseInterface 
 
         foreach ($xml_doc->entry as $article) {
 
-            $output['items'][$i][ItemMeta::COLUMN['TITLE']] = (string) $article->title;
-            $output['items'][$i][ItemMeta::COLUMN['ABSTRACT']] = trim(str_replace("\n", " ", (string) $article->summary));
+            $output['items'][$i][ItemMeta::COLUMN['TITLE']] = \Librarian\Import\ImportUtils::htmlToText((string) $article->title);
+            $output['items'][$i][ItemMeta::COLUMN['ABSTRACT']] = \Librarian\Import\ImportUtils::htmlToText((string) $article->summary);
             $output['items'][$i][ItemMeta::COLUMN['UID_TYPES']][] = 'ARXIV';
             $output['items'][$i][ItemMeta::COLUMN['UIDS']][] = substr(parse_url((string) $article->id, PHP_URL_PATH), 5);
 
             // Authors.
             foreach ($article->author as $author) {
 
-                $parts = explode(' ', trim((string) $author->name));
-                $output['items'][$i][ItemMeta::COLUMN['AUTHOR_LAST_NAME']][] = array_pop($parts);
-                $output['items'][$i][ItemMeta::COLUMN['AUTHOR_FIRST_NAME']][] = trim(join(' ', $parts));
+                [$last, $first] = \Librarian\Import\ImportUtils::splitRisName(trim((string) $author->name));
+
+                if ($last === '') {
+
+                    continue;
+                }
+
+                $output['items'][$i][ItemMeta::COLUMN['AUTHOR_LAST_NAME']][] = $last;
+                $output['items'][$i][ItemMeta::COLUMN['AUTHOR_FIRST_NAME']][] = $first;
             }
 
             // Reference type.

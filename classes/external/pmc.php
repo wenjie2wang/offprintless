@@ -24,8 +24,6 @@ final class Pmc extends ExternalDatabase implements ExternalDatabaseInterface {
     private string $url_fetch;
     private string $url_search;
 
-    private int $tries = 0;
-
     /**
      * Pubmed constructor.
      * @param DependencyInjector $di
@@ -81,35 +79,38 @@ final class Pmc extends ExternalDatabase implements ExternalDatabaseInterface {
             'retmode' => 'xml'
         ];
 
+        $body = $this->providerGet($this->client, 'Pubmed Central', 'pubmed', $this->url_fetch . http_build_query($params));
+
+        if ($body === null) {
+
+            return ['found' => 0, 'items' => []];
+        }
+
+        return $this->readXml($body);
+    }
+
+    /**
+     * Read an E-utilities XML answer. A page that is not XML (a maintenance notice) is an error, not "no results".
+     *
+     * @param string $body
+     * @return array
+     * @throws Exception
+     */
+    private function readXml(string $body): array {
+
+        // The answer must be the E-utilities document, not an HTML notice. An empty set is also a valid answer.
+        if (preg_match('~<(?:pmc-articleset|eFetchResult|ERROR)\b~i', substr($body, 0, 2000)) !== 1) {
+
+            throw new Exception('Pubmed Central returned an answer that could not be read', 502);
+        }
+
         try {
 
-            $this->queue->wait('pubmed');
-            $response = $this->client->get($this->url_fetch . http_build_query($params));
-            $this->queue->release('pubmed');
+            return $this->formatMetadata($body);
 
-            return $this->formatMetadata($response->getBody()->getContents());
+        } catch (Exception $e) {
 
-        } catch (BadResponseException $e) {
-
-            if ($e->getCode() === 429) {
-
-                if ($this->tries < 3) {
-
-                    sleep(1);
-                    $this->tries++;
-                    return $this->fetchMultiple($uids);
-
-                } else {
-
-                    $this->queue->release('pubmed');
-                    throw new Exception('Pubmed server is busy, try again later');
-                }
-
-            } else {
-
-                $this->queue->release('pubmed');
-                throw new Exception('Pubmed server error');
-            }
+            throw new Exception('Pubmed Central returned an answer that could not be read', 502);
         }
     }
 
@@ -252,50 +253,26 @@ final class Pmc extends ExternalDatabase implements ExternalDatabaseInterface {
 
         if (empty($items)) {
 
-            try {
+            $contents = $this->providerGet($this->client, 'Pubmed Central', 'pubmed', $this->url_search . http_build_query($params));
+            $json = $contents === null ? [] : json_decode($contents, true);
 
-                $this->queue->wait('pubmed');
-                $response = $this->client->get($this->url_search . http_build_query($params));
-                $this->queue->release('pubmed');
+            if ($contents !== null && is_array($json) === false) {
 
-                $contents = $response->getBody()->getContents();
-                $json = json_decode($contents, true);
-
-                $items['items'] = [];
-
-                if (!empty($json['esearchresult']['idlist'])) {
-
-                    usleep(100001);
-                    $items = $this->fetchMultiple($json['esearchresult']['idlist']);
-                }
-
-                $items['found'] = $json['esearchresult']['count'] ?? 0;
-
-                // Hold in Cache for 24h.
-                $this->cache->set($key, $items, 86400);
-
-            } catch (BadResponseException $e) {
-
-                if ($e->getCode() === 429) {
-
-                    if ($this->tries < 3) {
-
-                        sleep(1);
-                        $this->tries++;
-                        return $this->search($terms, $start, $rows, $filters, $sort);
-
-                    } else {
-
-                        $this->queue->release('pubmed');
-                        throw new Exception('Pubmed server is busy, try again later');
-                    }
-
-                } else {
-
-                    $this->queue->release('pubmed');
-                    throw new Exception('Pubmed server error');
-                }
+                throw new Exception('Pubmed Central returned an answer that could not be read', 502);
             }
+
+            $items = ['found' => 0, 'items' => []];
+
+            if (!empty($json['esearchresult']['idlist'])) {
+
+                usleep(100001);
+                $items = $this->fetchMultiple($json['esearchresult']['idlist']);
+            }
+
+            $items['found'] = $json['esearchresult']['count'] ?? 0;
+
+            // Hold in Cache for 24h.
+            $this->cache->set($key, $items, 86400);
         }
 
         // Paging.
