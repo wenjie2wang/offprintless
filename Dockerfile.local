@@ -9,7 +9,7 @@ LABEL org.opencontainers.image.title="Offprintless" \
       org.opencontainers.image.description="Self-hosted reference manager for PDFs and bibliographic metadata, with project-based access. A fork of I, Librarian Free." \
       org.opencontainers.image.version="5.11.3" \
       org.opencontainers.image.licenses="GPL-3.0-only" \
-      org.opencontainers.image.source="https://github.com/mkucej/i-librarian-free" \
+      org.opencontainers.image.source="https://github.com/wenjie2wang/offprintless" \
       org.opencontainers.image.base.name="ubuntu:22.04"
 
 ARG TIMEZONE="UTC"
