@@ -45,6 +45,9 @@ class AuthenticationModel extends AppModel {
      */
     protected function _authenticate(string $username, string $password, string $session_id): array {
 
+        // Brute-force protection: too many recent failures for this name (known or not) block further attempts.
+        $this->throttleCheck($username);
+
         // Allow sign in using username, or email.
         switch (filter_var($username, FILTER_VALIDATE_EMAIL)) {
 
@@ -89,10 +92,18 @@ EOT;
 
         $row = $this->db_main->getResultRow();
 
-        if(empty($row) || $row['status'] === 'D') {
+        // One answer for unknown user, deleted account, external account and wrong password, so usernames cannot be
+        // probed. Suspension is only revealed to someone who knows the password.
+        $password_ok = empty($row) === false
+            && $row['status'] !== 'D'
+            && $row['password'] !== ''
+            && $this->encryption->verifyPassword($password, $row['password']);
+
+        if ($password_ok === false) {
 
             $this->db_main->rollBack();
-            throw new Exception('account does not exist', 403);
+            $this->throttleFail($username);
+            throw new Exception('incorrect username or password', 403);
         }
 
         if ($row['status'] === 'S') {
@@ -101,18 +112,7 @@ EOT;
             throw new Exception('account is suspended', 403);
         }
 
-        // LDAP users have blank password.
-        if($row['password'] === '') {
-
-            $this->db_main->rollBack();
-            throw new Exception('this is an external account, password must be reset', 403);
-        }
-
-        if($this->encryption->verifyPassword($password, $row['password']) === false) {
-
-            $this->db_main->rollBack();
-            throw new Exception('incorrect password', 403);
-        }
+        $this->throttleClear($username);
 
         // Rehash password, if necessary.
         $rehash = $this->encryption->rehashPassword($password, $row['password']);
@@ -383,5 +383,54 @@ EOT;
         ];
 
         $this->db_main->run($sql_session, $columns_session);
+    }
+
+    /**
+     * Failed sign-ins are counted per lower-cased name in logs.db. Names that do not exist are counted too, so the
+     * throttle cannot be used to find out which names exist.
+     */
+    private const SIGNIN_MAX_FAILURES = 8;
+    private const SIGNIN_WINDOW_MINUTES = 15;
+
+    private function throttleTable(): void {
+
+        $this->db_logs->run('CREATE TABLE IF NOT EXISTS signin_failures (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )');
+        $this->db_logs->run('CREATE INDEX IF NOT EXISTS ix_signin_failures_name ON signin_failures(name, created)');
+    }
+
+    private function throttleKey(string $username): string {
+
+        return mb_strtolower(trim($username));
+    }
+
+    private function throttleCheck(string $username): void {
+
+        $this->throttleTable();
+        $this->db_logs->run(
+            "DELETE FROM signin_failures WHERE created < datetime('now', '-1 day')"
+        );
+        $this->db_logs->run(
+            "SELECT count(*) FROM signin_failures WHERE name = ? AND created >= datetime('now', ?)",
+            [$this->throttleKey($username), '-' . self::SIGNIN_WINDOW_MINUTES . ' minutes']
+        );
+
+        if ((int) $this->db_logs->getResult() >= self::SIGNIN_MAX_FAILURES) {
+
+            throw new Exception('too many failed sign-in attempts, try again in ' . self::SIGNIN_WINDOW_MINUTES . ' minutes', 429);
+        }
+    }
+
+    private function throttleFail(string $username): void {
+
+        $this->db_logs->run('INSERT INTO signin_failures (name) VALUES (?)', [$this->throttleKey($username)]);
+    }
+
+    private function throttleClear(string $username): void {
+
+        $this->db_logs->run('DELETE FROM signin_failures WHERE name = ?', [$this->throttleKey($username)]);
     }
 }

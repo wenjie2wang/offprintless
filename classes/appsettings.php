@@ -70,7 +70,7 @@ final class AppSettings {
         'custom7'             => 'Custom 7',
         'custom8'             => 'Custom 8',
         'custom_bibtex'       => ['author', '-', 'year', '-', 'title'],
-        'default_permissions' => 'A',
+        'default_permissions' => 'G',
         'disallow_signup'     => '0',
         'math_formatting'     => '0',
         'max_items'           => '10000',

@@ -3,6 +3,14 @@
 
 	file_server
 
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "same-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
 	php_fastcgi unix//run/php/php8.1-fpm.sock {
 		# Forward headers.
 		header_up X-Forwarded-Proto {header.X-Forwarded-Proto}
