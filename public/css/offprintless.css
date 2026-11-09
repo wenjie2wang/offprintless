@@ -1,0 +1,510 @@
+/*
+ * Offprintless theme. Loaded after style.css, so it only overrides: no PHP view or script depends on it.
+ * Design tokens come first; everything below reads them. Light is the default, the existing "dark" user setting
+ * (body.content-dark) switches to the dark tokens.
+ */
+
+:root {
+    /* Paper and ink: warm neutrals, one ink-blue accent, one highlighter-yellow mark. */
+    --op-paper: #f7f4ee;
+    --op-paper-2: #efeae0;
+    --op-card: #fffdf8;
+    --op-line: #ded7c8;
+    --op-ink: #1d2433;
+    --op-ink-2: #4a5468;
+    --op-ink-3: #7b8498;
+    --op-accent: #1f4e8c;
+    --op-accent-hover: #173d70;
+    --op-accent-ink: #ffffff;
+    --op-accent-soft: #e3ebf6;
+    --op-mark: #f6d765;
+    --op-ok: #2f7d5b;
+    --op-warn: #b4651f;
+    --op-bad: #b3372f;
+    --op-radius: 10px;
+    --op-shadow: 0 1px 2px rgba(29, 36, 51, .06), 0 4px 14px rgba(29, 36, 51, .06);
+    --op-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+    --op-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Noto Serif", serif;
+}
+
+body.content-dark {
+    --op-paper: #14171f;
+    --op-paper-2: #1a1e28;
+    --op-card: #1f2430;
+    --op-line: #2f3646;
+    --op-ink: #e8e6df;
+    --op-ink-2: #b4b9c6;
+    --op-ink-3: #868da0;
+    --op-accent: #7fb0f0;
+    --op-accent-hover: #a3c6f5;
+    --op-accent-ink: #0d1624;
+    --op-accent-soft: #24324a;
+    --op-mark: #8a7420;
+    --op-ok: #5fc596;
+    --op-warn: #e0a05a;
+    --op-bad: #ec7f77;
+    --op-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 4px 14px rgba(0, 0, 0, .3);
+}
+
+/* ---- Base ---- */
+body {
+    font-family: var(--op-sans);
+    color: var(--op-ink);
+}
+
+body.content-light,
+body.content-dark {
+    background-color: var(--op-paper);
+    color: var(--op-ink);
+}
+
+body.content-dark.text-white {
+    color: var(--op-ink) !important;
+}
+
+a {
+    color: var(--op-accent);
+}
+
+a:hover {
+    color: var(--op-accent-hover);
+}
+
+h1, h2, h3, h4, h5, .h1, .h2, .h3, .h4, .h5 {
+    font-family: var(--op-serif);
+    font-weight: 600;
+}
+
+.text-secondary, .text-muted {
+    color: var(--op-ink-3) !important;
+}
+
+::selection {
+    background: var(--op-mark);
+    color: #1d2433;
+}
+
+/* ---- Sidebar ---- */
+.left-container {
+    background: var(--op-paper-2);
+    border-right: 1px solid var(--op-line);
+}
+
+.left-container .navbar {
+    align-items: flex-start;
+}
+
+.left-container .navbar-dark .navbar-toggler {
+    color: var(--op-ink);
+}
+
+.left-container .metismenu,
+.left-container .metismenu ul {
+    width: 100%;
+}
+
+.left-container .metismenu a,
+.left-container .metismenu div[id] {
+    color: var(--op-ink-2);
+    border-radius: 8px;
+    margin: 1px 8px;
+    padding: 7px 10px;
+    transition: background-color .12s, color .12s;
+}
+
+.left-container .metismenu a:hover,
+.left-container .metismenu a:focus {
+    background: var(--op-accent-soft);
+    color: var(--op-ink);
+    text-decoration: none;
+}
+
+.left-container .metismenu .mm-active > a,
+.left-container .metismenu .active > a {
+    background: var(--op-card);
+    color: var(--op-ink);
+    font-weight: 600;
+    box-shadow: var(--op-shadow);
+}
+
+.left-container .metismenu ul a {
+    font-size: .95rem;
+}
+
+/* The brand banner above the menu. */
+.left-container .bg-primary {
+    background: var(--op-ink) !important;
+    color: var(--op-paper) !important;
+    font-family: var(--op-serif) !important;
+    letter-spacing: .02em;
+    border-radius: 0 0 var(--op-radius) var(--op-radius);
+}
+
+/* ---- Cards, lists, tables ---- */
+.card,
+.list-group,
+.item-container {
+    background-color: var(--op-card);
+    border: 1px solid var(--op-line) !important;
+    border-radius: var(--op-radius);
+    box-shadow: var(--op-shadow);
+    color: var(--op-ink);
+}
+
+.card-group > .card {
+    box-shadow: none;
+}
+
+.card-header {
+    background: transparent;
+    border-bottom: 1px solid var(--op-line);
+    font-family: var(--op-sans);
+    letter-spacing: .06em;
+    color: var(--op-ink-3);
+}
+
+.list-group-item {
+    background-color: transparent;
+    border-color: var(--op-line);
+    color: var(--op-ink);
+}
+
+.list-group-item:hover {
+    background-color: var(--op-accent-soft);
+}
+
+.bg-darker-3, .bg-darker-5 {
+    background-color: var(--op-paper-2);
+}
+
+.bg-darker-10 {
+    background-color: var(--op-line);
+}
+
+.table {
+    color: var(--op-ink);
+}
+
+.table td, .table th {
+    border-color: var(--op-line);
+}
+
+.breadcrumb {
+    font-size: .9rem;
+}
+
+.breadcrumb-item a {
+    color: var(--op-ink-3);
+}
+
+.breadcrumb-item.active {
+    color: var(--op-ink-2);
+}
+
+/* ---- Buttons: the app uses red outline-danger for its main actions; make those the accent. ---- */
+.btn {
+    border-radius: 8px;
+}
+
+.btn-primary,
+.btn-danger {
+    background-color: var(--op-accent);
+    border-color: var(--op-accent);
+    color: var(--op-accent-ink);
+    font-weight: 600;
+}
+
+.btn-primary:hover, .btn-primary:focus,
+.btn-danger:hover, .btn-danger:focus {
+    background-color: var(--op-accent-hover);
+    border-color: var(--op-accent-hover);
+    color: var(--op-accent-ink);
+}
+
+.btn-outline-danger,
+.btn-outline-primary {
+    color: var(--op-accent);
+    border-color: var(--op-accent);
+    background-color: transparent;
+}
+
+.btn-outline-danger:hover, .btn-outline-danger:focus,
+.btn-outline-primary:hover, .btn-outline-primary:focus {
+    background-color: var(--op-accent);
+    border-color: var(--op-accent);
+    color: var(--op-accent-ink);
+}
+
+.btn-outline-secondary {
+    color: var(--op-ink-2);
+    border-color: var(--op-line);
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--op-paper-2);
+    border-color: var(--op-ink-3);
+    color: var(--op-ink);
+}
+
+.btn:disabled, .btn.disabled {
+    opacity: .45;
+}
+
+.bg-primary {
+    background-color: var(--op-accent) !important;
+    color: var(--op-accent-ink) !important;
+}
+
+.badge-danger, .badge-primary {
+    background-color: var(--op-accent);
+    color: var(--op-accent-ink);
+}
+
+/* Destructive things keep a warning colour, so Delete is not mistaken for the main action. */
+.btn.delete, .btn.leave, .btn.inactivate {
+    color: var(--op-bad);
+    border-color: var(--op-bad);
+}
+
+.btn.delete:hover, .btn.leave:hover, .btn.inactivate:hover {
+    background-color: var(--op-bad);
+    border-color: var(--op-bad);
+    color: #fff;
+}
+
+
+/* The toolbar's yellow "warning" buttons (Search, Filter) become the accent; yellow stays reserved for highlights. */
+.btn-warning {
+    background-color: var(--op-accent);
+    border-color: var(--op-accent);
+    color: var(--op-accent-ink);
+    font-weight: 600;
+}
+
+.btn-warning:hover, .btn-warning:focus, .btn-warning:not(:disabled):not(.disabled):active {
+    background-color: var(--op-accent-hover);
+    border-color: var(--op-accent-hover);
+    color: var(--op-accent-ink);
+}
+
+/* Orange/yellow icons in the sidebar (Import) follow the accent too. */
+.left-container .text-warning {
+    color: var(--op-accent) !important;
+}
+
+/* Bottom toolbar of the item lists. */
+#toolbar, .bg-darker-5.border-top {
+    background-color: var(--op-paper-2);
+    border-top: 1px solid var(--op-line);
+}
+
+
+/* ---- Dark mode: the app hard-codes Bootstrap's bg-dark / bg-secondary greys; map them to the tokens. ---- */
+body.content-dark .bg-dark,
+body.content-dark .list-group-item.bg-dark {
+    background-color: var(--op-card) !important;
+}
+
+body.content-dark .bg-secondary {
+    background-color: var(--op-paper-2) !important;
+    color: var(--op-ink-2) !important;
+}
+
+body.content-dark .btn-secondary,
+body.content-dark .btn-dark {
+    background-color: var(--op-card);
+    border-color: var(--op-line);
+    color: var(--op-ink);
+}
+
+body.content-dark .btn-secondary:hover,
+body.content-dark .btn-dark:hover {
+    background-color: var(--op-accent-soft);
+    border-color: var(--op-ink-3);
+}
+
+body.content-dark .table-dark,
+body.content-dark .table-dark td,
+body.content-dark .table-dark th {
+    background-color: var(--op-card);
+    border-color: var(--op-line);
+    color: var(--op-ink);
+}
+
+/* Inputs, selects and textareas arrive as .bg-secondary.border-0 in dark mode; give them a visible field. */
+body.content-dark .form-control.bg-secondary,
+body.content-dark .custom-select.bg-secondary,
+body.content-dark select.bg-secondary,
+body.content-dark input.bg-secondary,
+body.content-dark textarea.bg-secondary {
+    background-color: var(--op-paper) !important;
+    border: 1px solid var(--op-line) !important;
+    color: var(--op-ink) !important;
+}
+
+body.content-dark .form-control.bg-secondary:focus,
+body.content-dark .custom-select.bg-secondary:focus {
+    border-color: var(--op-accent) !important;
+    box-shadow: 0 0 0 2px var(--op-accent-soft);
+}
+
+/* The PDF badge / download tile on each reference. */
+body.content-dark .item-container .btn-group-vertical > .btn,
+body.content-dark .item-container .btn-secondary,
+body.content-dark .item-container .btn-light {
+    background-color: var(--op-paper-2);
+    border-color: var(--op-line);
+    color: var(--op-ink-2);
+}
+
+body.content-dark .left-container .metismenu .mm-active > a,
+body.content-dark .left-container .metismenu .active > a {
+    background: var(--op-accent-soft);
+    color: var(--op-ink);
+    box-shadow: none;
+}
+
+body.content-dark #toolbar,
+body.content-dark .bg-darker-5.border-top {
+    background-color: var(--op-paper-2);
+}
+
+/* ---- Forms ---- */
+.form-control, .custom-select {
+    background-color: var(--op-card);
+    border: 1px solid var(--op-line);
+    border-radius: 8px;
+    color: var(--op-ink);
+}
+
+.form-control:focus, .custom-select:focus {
+    background-color: var(--op-card);
+    border-color: var(--op-accent);
+    box-shadow: 0 0 0 2px var(--op-accent-soft);
+    color: var(--op-ink);
+}
+
+.form-control::placeholder {
+    color: var(--op-ink-3);
+}
+
+.form-group label {
+    color: var(--op-ink-2);
+}
+
+.custom-control-input:checked ~ .custom-control-label::before {
+    background-color: var(--op-accent);
+    border-color: var(--op-accent);
+}
+
+/* ---- Alerts, modals, popovers ---- */
+.alert {
+    border-width: 1px;
+    border-radius: var(--op-radius);
+    font-weight: normal;
+}
+
+.alert-danger {
+    background: color-mix(in srgb, var(--op-bad) 12%, var(--op-card));
+    border-color: var(--op-bad);
+    color: var(--op-ink);
+}
+
+.alert-success {
+    background: color-mix(in srgb, var(--op-ok) 12%, var(--op-card));
+    border-color: var(--op-ok);
+    color: var(--op-ink);
+}
+
+.alert-warning, .alert-info {
+    background: color-mix(in srgb, var(--op-warn) 12%, var(--op-card));
+    border-color: var(--op-warn);
+    color: var(--op-ink);
+}
+
+.modal-content {
+    background-color: var(--op-card);
+    border: 1px solid var(--op-line);
+    border-radius: var(--op-radius);
+    color: var(--op-ink);
+}
+
+.modal-header, .modal-footer {
+    border-color: var(--op-line);
+}
+
+.popover, .dropdown-menu {
+    background-color: var(--op-card);
+    border: 1px solid var(--op-line);
+    border-radius: var(--op-radius);
+    color: var(--op-ink);
+}
+
+.dropdown-item {
+    color: var(--op-ink-2);
+}
+
+.dropdown-item:hover {
+    background: var(--op-accent-soft);
+    color: var(--op-ink);
+}
+
+.jGrowl .jGrowl-notification.bg-primary {
+    background-color: var(--op-accent) !important;
+}
+
+/* ---- References: the item rows and thumbnails ---- */
+.item-container h5, .item-container .h5 {
+    font-family: var(--op-serif);
+    line-height: 1.35;
+}
+
+.item-container a {
+    color: var(--op-ink);
+}
+
+.item-container a:hover {
+    color: var(--op-accent);
+}
+
+.badge-secondary {
+    background: var(--op-paper-2);
+    color: var(--op-ink-2);
+    border-radius: 5px;
+}
+
+/* Highlights keep the highlighter colour. */
+mark, .highlight {
+    background: linear-gradient(transparent 55%, var(--op-mark) 55%);
+    color: inherit;
+    padding: 0;
+}
+
+/* ---- Sign-in / registration ---- */
+#signin-form, form[action$="signin"], form[action$="createaccount"] {
+    background: var(--op-card);
+    border: 1px solid var(--op-line);
+    border-radius: var(--op-radius);
+    box-shadow: var(--op-shadow);
+    padding: 1.5rem;
+}
+
+/* ---- Small screens: let the sidebar collapse cleanly ---- */
+@media (max-width: 991px) {
+    .left-container {
+        border-right: 0;
+        border-bottom: 1px solid var(--op-line);
+    }
+}
+
+/* ---- Keep the PDF viewer paper-neutral: a coloured page tint would misrepresent the document ---- */
+#pdfviewer-pages, .pdfviewer-page {
+    background-color: transparent;
+}
+
+@media print {
+    body {
+        background: #fff !important;
+        color: #000 !important;
+    }
+}

@@ -26,7 +26,8 @@ class MainView extends TextView {
         $this->styleLink('css/plugins.css');
 
         // Override content-light when not authenticated.
-        $this->style = <<<STYLE
+        // The photo backdrop belongs to the classic look. The Offprintless theme uses its own plain paper.
+        $photo_css = <<<STYLE
 body.content-light {
     background-color: #111111;
     background-repeat: no-repeat;
@@ -79,6 +80,21 @@ body.content-light {
         backdrop-filter: blur(10px);
         background-color: rgba(245,250,255,0.25);
     }
+}
+STYLE;
+
+        $this->style = $this::$theme === 'classic' ? $photo_css : <<<STYLE
+.card {
+    width: 100%;
+    max-width: 400px;
+}
+
+#version-badge {
+    position: absolute;
+    bottom: 1rem;
+    right: 1rem;
+    padding: 0 0.5rem;
+    color: var(--op-ink-3);
 }
 STYLE;
 

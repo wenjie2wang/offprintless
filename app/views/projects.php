@@ -212,6 +212,9 @@ class ProjectsView extends TextView {
                 $is_public = ($project['is_public'] ?? 'N') === 'Y';
                 $role_label = $this->lang->t9n(ucfirst($project['role'] ?? 'viewer'));
 
+                // The seeded Public project has no meaningful owner to show.
+                $owner_html = $is_public ? '' : "<b>{$this->lang->t9n('Owner')}:</b> {$project['name']} &middot;";
+
                 /** @var Bootstrap\Button $el */
                 $el = $this->di->get('Button');
 
@@ -300,7 +303,7 @@ class ProjectsView extends TextView {
                 $list .= <<<ACTIVE
                     <div class="mb-2 active-project-container">
                         <h5><a class="active-project" href="{$IL_BASE_URL}index.php/project#project/browse?id={$project['id']}">{$project['project']}</a></h5>
-                        <b>{$this->lang->t9n('Owner')}:</b> {$project['name']} &middot;
+                        {$owner_html}
                         <b>{$this->lang->t9n('Your role')}:</b> {$role_label} &middot;
                         <b>{$this->lang->t9n('Created')}:</b> $date <br>
                         $inactivate $leave $edit $delete

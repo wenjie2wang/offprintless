@@ -72,6 +72,25 @@ class SettingsView extends TextView {
 
         $el = null;
 
+        /** @var Bootstrap\Input $el */
+        $el = $this->di->get('Input');
+
+        $el->type('radio');
+        $el->inline(true);
+        $el->id('theme_classic');
+        $el->name('settings[theme]');
+        $el->value('classic');
+        $el->label($this->lang->t9n('classic'));
+
+        if ($user_settings['theme'] === 'classic') {
+
+            $el->checked('checked');
+        }
+
+        $radios_l .= $el->render();
+
+        $el = null;
+
         /*
          * Sorting.
          */

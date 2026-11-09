@@ -198,7 +198,9 @@ abstract class TextView extends View {
 
         } else {
 
+            // "classic" is the original look; every other value gets the Offprintless theme (light or dark).
             $theme_class = self::$theme === 'dark' ? 'content-dark text-white' : 'content-light';
+            $theme_css = self::$theme === 'classic' ? '' : '<link href="' . IL_BASE_URL . 'css/offprintless.css?v=' . IL_VERSION . '" rel="stylesheet">';
 
             // HTML. Construct <head> and open <body>.
             $IL_BASE_URL = IL_BASE_URL;
@@ -222,6 +224,7 @@ abstract class TextView extends View {
                         <meta name="theme-color" content="#333333">
                         $this->head_links
                         <link href="{$IL_BASE_URL}css/style.css?v=$IL_VERSION" rel="stylesheet">
+                        $theme_css
                         <style>$this->style</style>
                     </head>
                     <body class="$theme_class">
