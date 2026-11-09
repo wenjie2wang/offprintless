@@ -9,3 +9,4 @@ config/ilibrarian.ini
 package.sh
 .e2e-config-*
 .e2e-data-*
+.e2e-probe

@@ -3,6 +3,7 @@
 namespace LibrarianApp;
 
 use Exception;
+use Librarian\Http\SafeDownloader;
 use GuzzleHttp\Psr7\Utils;
 use Librarian\Container\DependencyInjector;
 use Librarian\External\Crossref;
@@ -122,25 +123,10 @@ class ImportController extends AppController {
 
         if (!empty($this->post['remote_url'])) {
 
-            // Safe link?
-            $this->validation->ssrfLink($this->post['remote_url']);
-
-            $jar = new CookieJar();
-
-            /** @var Client $client */
-            $client = $this->di->get('HttpClient', [
-                [
-                    'timeout' => 30,
-                    'curl'    => [
-                        CURLOPT_PROXY        => $this->app_settings->proxyUrl(),
-                        CURLOPT_PROXYUSERPWD => $this->app_settings->proxyUserPwd(),
-                        CURLOPT_PROXYAUTH    => $this->app_settings->proxyAuthType()
-                    ]
-                ]
-            ]);
-
-            /** @var Response $response */
-            $response = $client->request('GET', $this->post['remote_url'], ['sink' => $temp_filename, 'cookies' => $jar]);
+            // Guarded download: every hop is checked, redirects to internal addresses are refused, size is capped.
+            /** @var SafeDownloader $downloader */
+            $downloader = $this->di->get('SafeDownloader');
+            $response = $downloader->download($this->post['remote_url'], $temp_filename, ['cookies' => new CookieJar()]);
 
             // Client filename.
             $decorator = new ResponseDecorator($response);
@@ -334,28 +320,15 @@ class ImportController extends AppController {
 
             if (!empty($this->post['remote_url'])) {
 
-                // Safe link?
-                $this->validation->ssrfLink($this->post['remote_url']);
+                // Guarded download into a temp file, then read it. Metadata files are small: cap at 20 MB.
+                $temp_text = IL_TEMP_PATH . DIRECTORY_SEPARATOR . uniqid('text_');
 
-                $jar = new CookieJar();
+                /** @var SafeDownloader $downloader */
+                $downloader = $this->di->get('SafeDownloader');
+                $downloader->download($this->post['remote_url'], $temp_text, ['cookies' => new CookieJar()]);
 
-                /** @var Client $client */
-                $client = $this->di->get('HttpClient', [
-                    [
-                        'timeout' => 30,
-                        'curl'    => [
-                            CURLOPT_PROXY        => $this->app_settings->proxyUrl(),
-                            CURLOPT_PROXYUSERPWD => $this->app_settings->proxyUserPwd(),
-                            CURLOPT_PROXYAUTH    => $this->app_settings->proxyAuthType()
-                        ]
-                    ]
-                ]);
-
-                /** @var Response $response */
-                $response = $client->request('GET', $this->post['remote_url'], ['stream' => true, 'cookies' => $jar]);
-
-                $stream = $response->getBody();
-                $this->post['text'] = $stream->getContents();
+                $this->post['text'] = (string) file_get_contents($temp_text);
+                unlink($temp_text);
 
             } else {
 

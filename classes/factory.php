@@ -228,6 +228,26 @@ final class Factory {
             return new \Librarian\External\Nasaads($this->di, $key);
         });
 
+        // Guarded remote file download. Pass the same cURL options the other HTTP clients use (proxy).
+        $this->di->set('SafeDownloader', function () {
+
+            $app_settings = $this->di->getShared('AppSettings');
+            $client = $this->di->get('HttpClient', [[
+                'timeout'         => 30,
+                'connect_timeout' => 10,
+                'curl'            => [
+                    CURLOPT_PROXY        => $app_settings->proxyUrl(),
+                    CURLOPT_PROXYUSERPWD => $app_settings->proxyUserPwd(),
+                    CURLOPT_PROXYAUTH    => $app_settings->proxyAuthType()
+                ]
+            ]]);
+
+            // Same ceiling as an upload through the web form.
+            $max_bytes = $this->di->getShared('ScalarUtils')->unformatBytes(ini_get('upload_max_filesize'));
+
+            return new \Librarian\Http\SafeDownloader($client, null, $max_bytes > 0 ? $max_bytes : 100000000);
+        });
+
         $this->di->set('Scopus', function ($key) {
 
             return new \Librarian\External\Scopus($this->di, $key);

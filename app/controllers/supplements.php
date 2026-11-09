@@ -3,6 +3,8 @@
 namespace LibrarianApp;
 
 use Exception;
+use Librarian\Http\SafeDownloader;
+use GuzzleHttp\Cookie\CookieJar;
 use Librarian\Container\DependencyInjector;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
@@ -80,23 +82,15 @@ class SupplementsController extends AppController {
         // Remote URL?
         if (!empty($this->post['remote_url'])) {
 
-            // Safe link?
-            $this->validation->ssrfLink($this->post['remote_url']);
+            // Guarded download into a temp file.
+            $temp_save = IL_TEMP_PATH . DIRECTORY_SEPARATOR . uniqid('remote_supp_');
 
-            $this->client = $this->di->get('HttpClient', [
-                [
-                    'timeout' => 30,
-                    'curl'    => [
-                        CURLOPT_PROXY        => $this->app_settings->proxyUrl(),
-                        CURLOPT_PROXYUSERPWD => $this->app_settings->proxyUserPwd(),
-                        CURLOPT_PROXYAUTH    => $this->app_settings->proxyAuthType()
-                    ]
-                ]
-            ]);
+            /** @var SafeDownloader $downloader */
+            $downloader = $this->di->get('SafeDownloader');
+            $downloader->download($this->post['remote_url'], $temp_save);
 
-            $response = $this->client->request('GET', $this->post['remote_url'], ['stream' => true]);
-            $stream = $response->getBody();
-            $name = basename($this->post['remote_url']);
+            $stream = \GuzzleHttp\Psr7\Utils::streamFor(\GuzzleHttp\Psr7\Utils::tryFopen($temp_save, 'rb'));
+            $name = basename(parse_url($this->post['remote_url'], PHP_URL_PATH) ?: 'file');
 
         } else {
 

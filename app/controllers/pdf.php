@@ -3,6 +3,7 @@
 namespace LibrarianApp;
 
 use Exception;
+use Librarian\Http\SafeDownloader;
 use GuzzleHttp\Psr7\UploadedFile;
 use Librarian\Container\DependencyInjector;
 use GuzzleHttp\Cookie\CookieJar;
@@ -213,25 +214,10 @@ class PdfController extends AppController {
 
         } elseif (!empty($this->post['remote_url'])) {
 
-            // Safe link?
-            $this->validation->ssrfLink($this->post['remote_url']);
-
-            $client = $this->di->get('HttpClient', [
-                [
-                    'timeout' => 30,
-                    'curl'    => [
-                        CURLOPT_PROXY        => $this->app_settings->proxyUrl(),
-                        CURLOPT_PROXYUSERPWD => $this->app_settings->proxyUserPwd(),
-                        CURLOPT_PROXYAUTH    => $this->app_settings->proxyAuthType()
-                    ]
-                ]
-            ]);
-
-            /** @var Response $response */
-            $jar = new CookieJar();
-
-            /** @var Response $response */
-            $response = $client->get($this->post['remote_url'], ['sink' => $temp_save, 'cookies' => $jar]);
+            // Guarded download: every hop is checked, redirects to internal addresses are refused, size is capped.
+            /** @var SafeDownloader $downloader */
+            $downloader = $this->di->get('SafeDownloader');
+            $response = $downloader->download($this->post['remote_url'], $temp_save, ['cookies' => new CookieJar()]);
 
             // Client filename.
             $decorator = new ResponseDecorator($response);

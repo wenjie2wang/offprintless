@@ -74,36 +74,14 @@ final class Validation {
      */
     public function ssrfLink(string $value): void {
 
-        // First check URL.
-        $this->url($value);
+        try {
 
-        $host = parse_url($value, PHP_URL_HOST);
+            \Librarian\Http\SafeDownloader::checkUrl($value);
 
-        // Prevent IP based addresses and localhost.
-        if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)  || filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+        } catch (Exception $exc) {
 
-            throw new Exception('invalid link to an IP-host', $this->http_code);
-        }
-
-        // Deal with wildcard DNS.
-        $ip = gethostbyname($host);
-        $ip = ip2long($ip);
-
-        if ($ip === false || $ip === 0) {
-
-            throw new Exception('invalid link provided', $this->http_code);
-        }
-
-        $is_inner_ipaddress =
-            ip2long('127.0.0.0')   >> 24 === $ip >> 24 or
-            ip2long('10.0.0.0')    >> 24 === $ip >> 24 or
-            ip2long('172.16.0.0')  >> 20 === $ip >> 20 or
-            ip2long('169.254.0.0') >> 16 === $ip >> 16 or
-            ip2long('192.168.0.0') >> 16 === $ip >> 16;
-
-        if ($is_inner_ipaddress) {
-
-            throw new Exception('invalid link to internal network', $this->http_code);
+            // Keep this class's HTTP code for validation errors.
+            throw new Exception($exc->getMessage(), $this->http_code);
         }
     }
 

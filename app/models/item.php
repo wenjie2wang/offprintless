@@ -1481,12 +1481,13 @@ EOT;
 
             $item = $this->_save($entry + $data);
 
-            // Save PDF
+            // Save PDF. The path comes from the imported file, so it is only trusted after it resolves to a real file
+            // inside the import folder. Whether the user may add to the target project was checked by _save() above.
             if (!empty($entry['PDF']) && !empty($item['item_id'])) {
 
-                $pdf_file = IL_DATA_PATH . DIRECTORY_SEPARATOR . 'import' . DIRECTORY_SEPARATOR . $entry['PDF'];
+                $pdf_file = $this->importFilePath((string) $entry['PDF']);
 
-                if (is_readable($pdf_file)) {
+                if ($pdf_file !== null && is_readable($pdf_file)) {
 
                     $fp = fopen($pdf_file, 'rb');
                     $stream = \GuzzleHttp\Psr7\Utils::streamFor($fp);
@@ -1509,6 +1510,47 @@ EOT;
         $pdf_object = null;
 
         return ['count' => $count];
+    }
+
+    /**
+     * Resolve a file path taken from an imported BibTeX or RIS file to a real file inside the import folder.
+     *
+     * Returns null for anything else: absolute paths, "..", symbolic links that lead out, missing files, and
+     * directories. Both sides are resolved with realpath(), so a link or a ".." anywhere in the path cannot escape.
+     *
+     * @param string $relative Path as written in the imported file.
+     * @return string|null
+     */
+    private function importFilePath(string $relative): ?string {
+
+        $relative = trim($relative);
+
+        if ($relative === '' || strpos($relative, "\0") !== false) {
+
+            return null;
+        }
+
+        // Only a relative path is meant. Refuse absolute paths and Windows drive letters up front.
+        if ($relative[0] === '/' || $relative[0] === '\\' || preg_match('/^[a-zA-Z]:/', $relative) === 1) {
+
+            return null;
+        }
+
+        $base = realpath(IL_DATA_PATH . DIRECTORY_SEPARATOR . 'import');
+        $path = realpath($base . DIRECTORY_SEPARATOR . $relative);
+
+        if ($base === false || $path === false || is_file($path) === false) {
+
+            return null;
+        }
+
+        // The resolved path must sit below the import folder.
+        if (strpos($path, $base . DIRECTORY_SEPARATOR) !== 0) {
+
+            return null;
+        }
+
+        return $path;
     }
 
     /**

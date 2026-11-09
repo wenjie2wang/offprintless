@@ -97,11 +97,11 @@ class DetailsController extends AppController {
             ],
             'upload_max_filesize' => [
                 'present'  => ini_get('upload_max_filesize'),
-                'required' => '200M'
+                'required' => '100M'
             ],
             'post_max_size' => [
                 'present'  => ini_get('post_max_size'),
-                'required' => '800M'
+                'required' => '120M'
             ],
             'max_input_vars' => [
                 'present'  => ini_get('max_input_vars'),
