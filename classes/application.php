@@ -76,6 +76,9 @@ final class Application {
             $gc = $this->di->getShared('GarbageCollector');
             $gc->cleanGarbage();
             $gc = null;
+
+            // Activity logs: roll up old detail, drop what is past retention (at most once a day).
+            $this->di->getShared('Logger')->compact();
         }
 
         // Convert URL request to route parts.

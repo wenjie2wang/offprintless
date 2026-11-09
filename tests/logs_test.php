@@ -51,9 +51,10 @@ check('recent activity names the user and the item', [$r['recent'][0]['name'] ??
 check('recent activity has all four kinds', count(array_unique(array_column($r['recent'], 'kind'))), 4);
 
 echo "--- window ---\n";
-logsql($app, "UPDATE opens SET created = datetime('now','-90 days')");
+logsql($app, "UPDATE opens SET created = datetime('now','-40 days')");
 check('activity older than the window is not counted', (int) ($app->model('LogsModel')->report(30)['users'][0]['opens'] ?? 0) + (int) array_sum(array_column($app->model('LogsModel')->report(30)['users'], 'opens')), 0);
-check('...but is counted in a wider window', array_sum(array_map('intval', array_column($app->model('LogsModel')->report(365)['users'], 'opens'))), 1);
+logsql($app, "UPDATE opens SET created = datetime('now','-20 days')");
+check('...but is counted again inside the 30-day limit', array_sum(array_map('intval', array_column($app->model('LogsModel')->report(30)['users'], 'opens'))), 1);
 
 echo "--- who may read it ---\n";
 $as($aliceH, 'U');

@@ -34,12 +34,13 @@ class LogsView extends TextView {
         $base = IL_BASE_URL . 'index.php#logs/main?days=';
         $links = [];
 
-        foreach ([7 => '7 days', 30 => '30 days', 90 => '90 days', 365 => 'year'] as $d => $label) {
+        foreach ([7 => '7 days', 14 => '14 days', 30 => '30 days'] as $d => $label) {
 
             $links[] = $d === $days ? "<b>{$this->lang->t9n($label)}</b>" : "<a href=\"{$base}{$d}\">{$this->lang->t9n($label)}</a>";
         }
 
-        $window = '<p>' . $this->lang->t9n('Period') . ': ' . join(' &middot; ', $links) . '</p>';
+        $window = '<p>' . $this->lang->t9n('Period') . ': ' . join(' &middot; ', $links) . '</p>'
+            . '<p class="text-secondary small">' . $this->lang->t9n('Details are kept for 7 days, daily totals for 30 days.') . '</p>';
 
         // Per-user totals.
         /** @var Bootstrap\Table $el */

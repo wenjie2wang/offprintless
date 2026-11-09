@@ -28,11 +28,15 @@ class LogsModel extends AppModel {
             throw new Exception('only administrators can read the activity logs', 403);
         }
 
-        $days = max(1, min($days, 3650));
+        // Activity is only kept for 30 days (see Logger::compact()).
+        $days = max(1, min($days, \Librarian\Logger\Logger::KEEP_DAYS));
         $since = gmdate('Y-m-d H:i:s', time() - $days * 86400);
 
         $this->db_main->run("SELECT id, ifnull(nullif(trim(first_name || ' ' || last_name), ''), username) AS name FROM users");
         $names = $this->db_main->getResultRows(\PDO::FETCH_KEY_PAIR);
+
+        // The roll-up tables are created on first use; make sure they exist before reading.
+        $this->db_logs->run('CREATE TABLE IF NOT EXISTS activity_daily (day TEXT NOT NULL, user_id INTEGER NOT NULL, kind TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (day, user_id, kind))');
 
         $counts = [];
 
@@ -45,13 +49,24 @@ class LogsModel extends AppModel {
 
         foreach (['opens' => 'opened', 'downloads' => 'downloaded', 'pages' => 'read', 'edits' => 'edited'] as $table => $kind) {
 
+            // Totals = recent detail rows + daily counts for the older days that fall inside the window.
             $this->db_logs->run("SELECT user_id, count(*) AS n FROM $table WHERE created >= ? GROUP BY user_id", [$since]);
 
             foreach ($this->db_logs->getResultRows() as $row) {
 
                 if (isset($counts[$row['user_id']])) {
 
-                    $counts[$row['user_id']][$table] = (int) $row['n'];
+                    $counts[$row['user_id']][$table] += (int) $row['n'];
+                }
+            }
+
+            $this->db_logs->run('SELECT user_id, sum(n) AS n FROM activity_daily WHERE kind = ? AND day >= date(?) GROUP BY user_id', [$table, $since]);
+
+            foreach ($this->db_logs->getResultRows() as $row) {
+
+                if (isset($counts[$row['user_id']])) {
+
+                    $counts[$row['user_id']][$table] += (int) $row['n'];
                 }
             }
 
