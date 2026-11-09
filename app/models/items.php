@@ -10,6 +10,7 @@ use Librarian\ItemMeta;
 use Librarian\Media\Language;
 use Librarian\Media\ScalarUtils;
 use Librarian\Security\ProjectAccess;
+use Librarian\Search\QueryBuilder;
 use Librarian\Security\Sanitation;
 use PDO;
 use ZipArchive;
@@ -875,8 +876,11 @@ EOT;
         int $project_id = null
     ): array {
 
+        // The form always sends arrays of equal length. Anything else is a bad request, not a database error.
+        $this->assertSearchRequest($search);
+
         // Search is empty.
-        if (join('', $search['search_query']) === '') {
+        if (trim(join('', $search['search_query'])) === '') {
 
             return [
                 'items' => [],
@@ -891,10 +895,23 @@ EOT;
             return $this->searchIds($item_ids, $collection, $orderby, $limit, $offset, $display_action, $project_id);
         }
 
-        // Item UID search.
+        // Item UID search. Each word is an identifier as a person writes it: a DOI with doi: or a doi.org link, an arXiv
+        // id with arXiv:, a PMID with PMID:. Letters in a DOI do not need the right case.
         if ($search['search_type'][0] === 'uid') {
 
-            $uids = explode(' ', $search['search_query'][0]);
+            $uids = [];
+
+            foreach (array_filter(explode(' ', trim($search['search_query'][0])), fn($w) => $w !== '') as $word) {
+
+                [$type, $value] = \Librarian\Import\Identifier::parse($word);
+                $uids[] = $type === null ? $word : $value;
+            }
+
+            if ($uids === []) {
+
+                return ['items' => [], 'total_count' => 0];
+            }
+
             return $this->searchUids($uids, $collection, $limit, $offset, $display_action, $project_id);
         }
 
@@ -918,6 +935,82 @@ EOT;
 
         // Advanced search.
         return $this->searchColumns($search, $collection, $orderby, $limit, $offset, $display_action, $project_id);
+    }
+
+    /**
+     * Reject a search request that is not what the search form sends.
+     *
+     * @param array $search
+     * @throws Exception 422
+     */
+    private function assertSearchRequest(array $search): void {
+
+        $types = ['metadata', 'anywhere', 'FT', 'pdfnotes', 'itemnotes', 'uid', 'itemid',
+                  'TI', 'AB', 'AU', 'AF', 'T1', 'T2', 'T3', 'JO', 'KW', 'YR', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8'];
+
+        foreach (['search_query', 'search_type'] as $key) {
+
+            if (isset($search[$key]) === false || is_array($search[$key]) === false || $search[$key] === []) {
+
+                throw new Exception('invalid search parameters', 422);
+            }
+        }
+
+        foreach ($search['search_query'] as $i => $query) {
+
+            if (is_string($query) === false || isset($search['search_type'][$i]) === false
+                || in_array($search['search_type'][$i], $types, true) === false) {
+
+                throw new Exception('invalid search parameters', 422);
+            }
+
+            // Every field of a text search has an operator. The id, UID and note searches ignore it.
+            if (in_array($search['search_type'][$i], ['uid', 'itemid'], true) === false
+                && isset($search['search_boolean'][$i]) === false) {
+
+                throw new Exception('invalid search parameters', 422);
+            }
+        }
+
+        foreach ((array) ($search['search_boolean'] ?? []) as $boolean) {
+
+            if (in_array($boolean, ['AND', 'OR', 'PHRASE'], true) === false) {
+
+                throw new Exception('invalid search parameters', 422);
+            }
+        }
+
+        foreach ((array) ($search['search_glue'] ?? []) as $glue) {
+
+            if (in_array($glue, ['AND', 'OR', 'NOT'], true) === false) {
+
+                throw new Exception('invalid search parameters', 422);
+            }
+        }
+
+        // Tag filters are lists of tag ids.
+        $filters = $search['search_filter'] ?? [];
+
+        if (is_array($filters) === false) {
+
+            throw new Exception('invalid search parameters', 422);
+        }
+
+        if (isset($filters['tag'])) {
+
+            if (is_array($filters['tag']) === false) {
+
+                throw new Exception('invalid search parameters', 422);
+            }
+
+            foreach ($filters['tag'] as $tag_id) {
+
+                if (is_numeric($tag_id) === false) {
+
+                    throw new Exception('invalid search parameters', 422);
+                }
+            }
+        }
     }
 
     /**
@@ -988,78 +1081,21 @@ EOT;
 
         $query = $scalar_utils->deaccent($search['search_query'][0], false);
 
-        $placeholder = '';
-        $columns = [];
         $join_collection = '';
         $where_collection = '';
         // Access model: only items in projects the user can see (admins see all).
         $where_visible = 'AND ind_items.id IN (' . $this->visibleItems() . ')';
-        $extra_characters = "''\"“”＂«‹›»-˗‐‑‒–−➖Ⲻ﹘!ǃⵑ！?.,;;:：#$&()/<>=@^{}|";
 
-        // Modify query based on boolean type.
-        switch ($search['search_boolean'][0]) {
+        // The year column is not indexed text: it is matched from the start ("2011", "201*").
+        $text_fields = array_values(array_filter($fields, fn($f) => $f !== 'items.publication_date'));
+        $built = QueryBuilder::build($text_fields, $query, $search['search_boolean'][0], 'items.publication_date');
 
-            case 'AND':
-            case 'OR':
+        if ($built === null) {
 
-                $placeholders = [];
-                $query_parts = array_filter(explode(' ', $query));
-
-                foreach ($query_parts as $term) {
-
-                    $field_placeholders = [];
-                    $term_like = $sanitation->queryLike($term);
-
-                    foreach ($fields as $field) {
-
-                        if ($field === 'items.publication_date') {
-
-                            $field_placeholders[] = "{$field} LIKE ? ESCAPE '\'";
-                            $columns[] = "{$term_like}%";
-
-                        } else {
-
-                            $field_placeholders[] = "({$field} LIKE ? ESCAPE '\' AND ({$field} LIKE ? ESCAPE '\' OR {$field} GLOB ? OR {$field} GLOB ? OR {$field} GLOB ?))";
-                            $columns[] = "%{$term_like}%";
-                            $columns[] = "% {$term_like} %";
-                            $columns[] = "* [{$extra_characters}]{$term} *";
-                            $columns[] = "* {$term}[{$extra_characters}] *";
-                            $columns[] = "* [{$extra_characters}]{$term}[{$extra_characters}] *";
-                        }
-                    }
-
-                    $placeholders[] = '(' . join(' OR ', $field_placeholders) . ')';
-                }
-
-                $placeholder = join(" {$search['search_boolean'][0]} ", $placeholders);
-                break;
-
-            case 'PHRASE':
-
-                $field_placeholders = [];
-                $query_like = $sanitation->queryLike($query);
-
-                foreach ($fields as $field) {
-
-                    if ($field === 'items.publication_date') {
-
-                        $field_placeholders[] = "{$field} LIKE ? ESCAPE '\'";
-                        $columns[] = "{$query_like}%";
-
-                    } else {
-
-                        $field_placeholders[] = "({$field} LIKE ? ESCAPE '\' AND ({$field} LIKE ? ESCAPE '\' OR {$field} GLOB ? OR {$field} GLOB ? OR {$field} GLOB ?))";
-                        $columns[] = "%{$query_like}%";
-                        $columns[] = "% {$query_like} %";
-                        $columns[] = "* [{$extra_characters}]{$query} *";
-                        $columns[] = "* {$query}[{$extra_characters}] *";
-                        $columns[] = "* [{$extra_characters}]{$query}[{$extra_characters}] *";
-                    }
-                }
-
-                $placeholder = '(' . join(' OR ', $field_placeholders) . ')';
-                break;
+            return $output;
         }
+
+        [$placeholder, $columns] = $built;
 
         $this->db_main->beginTransaction();
 
@@ -1108,40 +1144,10 @@ EOT;
 
         $columns[] = (integer) $this->app_settings->getGlobal('max_items');
 
-        // Try to get records from Cache.
-        $cache->context('searches');
-
-        $key = $cache->key(
-            __METHOD__
-            . serialize([$search, $collection, $orderby, $project_id, $this->visibleItems()])
-        );
-
-        // Debug.
-        $cache->delete($key);
-
-        // Last modified.
-        $sql_modified = <<<SQL
-SELECT changed_time
-    FROM stats
-    WHERE table_name = 'ind_items' 
-SQL;
-
-        $this->db_main->run($sql_modified);
-        $modified = strtotime($this->db_main->getResult());
-
-        // Get items from cache.
-        $rows = $cache->get($key, $modified);
-
-        // Cache is empty.
-        if (empty($rows)) {
-
-            // Execute search.
-            $this->db_main->run($sql, $columns);
-            $rows = $this->db_main->getResultRows();
-
-            // Save to cache.
-            $cache->set($key, $rows, $modified);
-        }
+        // Not cached: the answer depends on the user's access, clipboard and projects, which change without the index
+        // changing, and the query takes milliseconds.
+        $this->db_main->run($sql, $columns);
+        $rows = $this->db_main->getResultRows();
 
         if (empty($rows)) {
 
@@ -1208,9 +1214,8 @@ SQL;
         // SQL ORDER BY.
         $order = $this->orderByColumn($orderby);
 
-        /** @var Sanitation $sanitation */
-        $sanitation = $this->di->getShared('Sanitation');
-        $query = $sanitation->queryLike($search['search_query'][0]);
+        /** @var ScalarUtils $scalar_utils */
+        $scalar_utils = $this->di->getShared('ScalarUtils');
 
         $placeholder = '';
         $columns = [];
@@ -1220,32 +1225,17 @@ SQL;
         // Access model: only items in projects the user can see (admins see all).
         $where_visible = 'AND items.id IN (' . $this->visibleItems() . ')';
 
-        // Modify query based on boolean type.
-        switch ($search['search_boolean'][0]) {
+        // Same matching rules as the other searches, on the note text without accents.
+        $note_text = "(' ' || deaccent(annotations.annotation, 0) || ' ')";
+        $built = QueryBuilder::build([$note_text], $scalar_utils->deaccent($search['search_query'][0], false), $search['search_boolean'][0]);
 
-            case 'AND':
-            case 'OR':
+        if ($built === null) {
 
-                $placeholders = [];
-                $query_parts = array_filter(explode(' ', $query));
-
-                foreach ($query_parts as $term) {
-
-                    $placeholders[] = "' ' || annotations.annotation || ' ' LIKE ? ESCAPE '\'";
-                    $columns[] = "% {$term} %";
-                    $columns_count[] = "% {$term} %";
-                }
-
-                $placeholder = join(" {$search['search_boolean'][0]} ", $placeholders);
-                break;
-
-            case 'PHRASE':
-
-                $placeholder = "' ' || annotations.annotation || ' ' LIKE ? ESCAPE '\'";
-                $columns[] = "% {$query} %";
-                $columns_count[] = "% {$query} %";
-                break;
+            return $output;
         }
+
+        [$placeholder, $columns] = $built;
+        $columns_count = $columns;
 
         $this->db_main->beginTransaction();
 
@@ -1393,9 +1383,8 @@ EOT;
         // SQL ORDER BY.
         $order = $this->orderByColumn($orderby);
 
-        /** @var Sanitation $sanitation */
-        $sanitation = $this->di->getShared('Sanitation');
-        $query = $sanitation->queryLike($search['search_query'][0]);
+        /** @var ScalarUtils $scalar_utils */
+        $scalar_utils = $this->di->getShared('ScalarUtils');
 
         $placeholder = '';
         $columns = [];
@@ -1405,32 +1394,17 @@ EOT;
         // Access model: only items in projects the user can see (admins see all).
         $where_visible = 'AND items.id IN (' . $this->visibleItems() . ')';
 
-        // Modify query based on boolean type.
-        switch ($search['search_boolean'][0]) {
+        // Same matching rules as the other searches, on the note text without tags and accents.
+        $note_text = "(' ' || deaccent(striptags(item_notes.note), 0) || ' ')";
+        $built = QueryBuilder::build([$note_text], $scalar_utils->deaccent($search['search_query'][0], false), $search['search_boolean'][0]);
 
-            case 'AND':
-            case 'OR':
+        if ($built === null) {
 
-                $placeholders = [];
-                $query_parts = array_filter(explode(' ', $query));
-
-                foreach ($query_parts as $term) {
-
-                    $placeholders[] = "' ' || striptags(item_notes.note) || ' ' LIKE ? ESCAPE '\'";
-                    $columns[] = "% {$term} %";
-                    $columns_count[] = "% {$term} %";
-                }
-
-                $placeholder = join(" {$search['search_boolean'][0]} ", $placeholders);
-                break;
-
-            case 'PHRASE':
-
-                $placeholder = "' ' || striptags(item_notes.note) || ' ' LIKE ? ESCAPE '\'";
-                $columns[] = "% {$query} %";
-                $columns_count[] = "% {$query} %";
-                break;
+            return $output;
         }
+
+        [$placeholder, $columns] = $built;
+        $columns_count = $columns;
 
         $this->db_main->beginTransaction();
 
@@ -1617,126 +1591,64 @@ EOT;
         $where_visible = 'AND ind_items.id IN (' . $this->visibleItems() . ')';
         $extra_characters = "''\"“”＂«‹›»-˗‐‑‒–−➖Ⲻ﹘!ǃⵑ！?.,;;:：#$&()/<>=@^{}|";
 
+        // One condition per filled-in row, joined by the glue chosen on the row.
         foreach ($search['search_query'] as $key => $search_query) {
 
-            if (empty($search_query)) {
+            if (trim((string) $search_query) === '') {
 
                 continue;
             }
 
+            $type = $search['search_type'][$key];
+            $boolean = $search['search_boolean'][$key] ?? 'AND';
             $search_query = $scalar_utils->deaccent($search_query, false);
 
-            // Advanced search glue: AND/OR/NOT.
-            if (isset($search['search_glue'][$key]) && in_array($search['search_glue'][$key], ['AND', 'OR', 'NOT']) === false) {
+            if ($type === 'YR') {
 
-                throw new Exception('invalid search parameters', 422);
+                [$condition, $values] = QueryBuilder::year('items.publication_date', $search_query);
+
+            } elseif ($type === 'AU') {
+
+                // Authors and editors, by person: "Michele Funk" and "Funk, Michele" are the same name.
+                $by_author = QueryBuilder::people('ind_items.id', 'items_authors', 'authors', 'author_id', $search_query, $boolean);
+                $by_editor = QueryBuilder::people('ind_items.id', 'items_editors', 'editors', 'editor_id', $search_query, $boolean);
+
+                if ($by_author === null) {
+
+                    continue;
+                }
+
+                $condition = "({$by_author[0]} OR {$by_editor[0]})";
+                $values = array_merge($by_author[1], $by_editor[1]);
+
+            } else {
+
+                $field = $fields[$type];
+                $built = QueryBuilder::build((array) $field, $search_query, $boolean, in_array($type, ['TI', 'AB'], true) ? 'items.publication_date' : null);
+
+                if ($built === null) {
+
+                    continue;
+                }
+
+                [$condition, $values] = $built;
             }
 
-            if (isset($search['search_glue'][$key])) {
+            // The glue between this row and the ones before it.
+            if ($placeholder !== '') {
 
-                $search['search_glue'][$key] =  $search['search_glue'][$key] === 'NOT' ? 'AND NOT' :  $search['search_glue'][$key];
+                $glue = $search['search_glue'][$key] ?? 'AND';
+                $placeholder .= ' ' . ($glue === 'NOT' ? 'AND NOT' : $glue) . ' ';
             }
 
-            // Glue.
-            $placeholder .= $placeholder !== '' && isset($search['search_glue'][$key]) ? " {$search['search_glue'][$key]} " : '';
+            $placeholder .= $condition;
+            $columns = array_merge($columns, $values);
+        }
 
-            // Some fields must have PHRASE boolean.
-            if (in_array($search['search_type'][$key], ['AU', 'KW', 'JO', 'T1', 'T2', 'T3', 'YR', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8'])) {
+        // Nothing usable was typed.
+        if ($placeholder === '') {
 
-                $search['search_boolean'][$key] = 'PHRASE';
-            }
-
-            // Modify query based on boolean type.
-            switch ($search['search_boolean'][$key]) {
-
-                case 'AND':
-                case 'OR':
-
-                    $placeholders = [];
-                    $query_parts = array_filter(explode(' ', $search_query));
-
-                    foreach ($query_parts as $term) {
-
-                        $term_like = $sanitation->queryLike($term);
-
-                        // Placeholder.
-                        $field = $fields[$search['search_type'][$key]];
-
-                        if (is_array($field)) {
-
-                            $placeholder_parts = [];
-
-                            foreach ($field as $field_part) {
-
-                                $placeholder_parts[] = "({$field_part} LIKE ? ESCAPE '\' AND ({$field_part} LIKE ? ESCAPE '\' OR {$field_part} GLOB ? OR {$field_part} GLOB ? OR {$field_part} GLOB ?))";
-                                $columns[] = "%{$term_like}%";
-                                $columns[] = "% {$term_like} %";
-                                $columns[] = "* [{$extra_characters}]{$term} *";
-                                $columns[] = "* {$term}[{$extra_characters}] *";
-                                $columns[] = "* [{$extra_characters}]{$term}[{$extra_characters}] *";
-                            }
-
-                            $placeholders[] = '(' . join(' OR ', $placeholder_parts) . ')';
-
-                        } else {
-
-                            $placeholders[] = "({$field} LIKE ? ESCAPE '\' AND ({$field} LIKE ? ESCAPE '\' OR {$field} GLOB ? OR {$field} GLOB ? OR {$field} GLOB ?))";
-                            $columns[] = "%{$term_like}%";
-                            $columns[] = "% {$term_like} %";
-                            $columns[] = "* [{$extra_characters}]{$term} *";
-                            $columns[] = "* {$term}[{$extra_characters}] *";
-                            $columns[] = "* [{$extra_characters}]{$term}[{$extra_characters}] *";
-                        }
-                    }
-
-                    $placeholder .= join(" {$search['search_boolean'][$key]} ", $placeholders);
-
-                    break;
-
-                case 'PHRASE':
-
-                    // Placeholder.
-                    $field = $fields[$search['search_type'][$key]];
-
-                    $search_query_like = $sanitation->queryLike($search_query);
-
-                    // N.B. TI+AB, and AU+ED.
-                    if (is_array($field)) {
-
-                        $placeholder_parts = [];
-
-                        foreach ($field as $field_part) {
-
-                            $placeholder_parts[] = "({$field_part} LIKE ? ESCAPE '\' AND ({$field_part} LIKE ? ESCAPE '\' OR {$field_part} GLOB ? OR {$field_part} GLOB ? OR {$field_part} GLOB ?))";
-                            $columns[] = "%{$search_query_like}%";
-                            $columns[] = "% {$search_query_like} %";
-                            $columns[] = "* [{$extra_characters}]{$search_query} *";
-                            $columns[] = "* {$search_query}[{$extra_characters}] *";
-                            $columns[] = "* [{$extra_characters}]{$search_query}[{$extra_characters}] *";
-                        }
-
-                        $placeholder .= '(' . join(' OR ', $placeholder_parts) . ')';
-
-                    } else {
-
-                        if ($search['search_type'][$key] === 'YR') {
-
-                            $placeholder .= "{$field} LIKE ? ESCAPE '\'";
-                            $columns[] = "{$search_query_like}%";
-
-                        } else {
-
-                            $placeholder .= "({$field} LIKE ? ESCAPE '\' AND ({$field} LIKE ? ESCAPE '\' OR {$field} GLOB ? OR {$field} GLOB ? OR {$field} GLOB ?))";
-                            $columns[] = "%{$search_query_like}%";
-                            $columns[] = "% {$search_query_like} %";
-                            $columns[] = "* [{$extra_characters}]{$search_query} *";
-                            $columns[] = "* {$search_query}[{$extra_characters}] *";
-                            $columns[] = "* [{$extra_characters}]{$search_query}[{$extra_characters}] *";
-                        }
-                    }
-
-                    break;
-            }
+            return $output;
         }
 
         $this->db_main->beginTransaction();
@@ -1772,26 +1684,18 @@ EOT;
             $columns[] = $project_id;
         }
 
-        // Tag filters.
-        $tag_join = '';
+        // Tag filter: an item must have EVERY chosen tag.
         $tag_where = '';
+        $tag_ids = array_values(array_unique(array_map('intval', (array) ($search['search_filter']['tag'] ?? []))));
 
-        if (isset($search['search_filter'])) {
+        if ($tag_ids !== []) {
 
-            foreach ($search['search_filter'] as $type => $filters) {
+            $marks = join(', ', array_fill(0, count($tag_ids), '?'));
+            $tag_where = "AND (SELECT count(DISTINCT t.tag_id) FROM items_tags t WHERE t.item_id = ind_items.id AND t.tag_id IN ({$marks})) = " . count($tag_ids);
 
-                if ($type === 'tag') {
+            foreach ($tag_ids as $tag_id) {
 
-                    $tag_placeholders = array_fill(0, count($filters), '?');
-                    $tag_placeholder = join(', ', $tag_placeholders);
-                    $tag_join = 'LEFT JOIN items_tags ON ind_items.id=items_tags.item_id';
-                    $tag_where = "AND items_tags.tag_id IN ({$tag_placeholder}) GROUP BY ind_items.id";
-
-                    foreach ($filters as $tag_id) {
-
-                        $columns[] = $tag_id;
-                    }
-                }
+                $columns[] = $tag_id;
             }
         }
 
@@ -1800,7 +1704,6 @@ SELECT
     ind_items.id as item_id
     FROM items INNER JOIN ind_items ON items.id=ind_items.id
     {$join_collection}
-    {$tag_join}
     WHERE ({$placeholder})
     {$where_collection}
     {$where_visible}
@@ -1811,40 +1714,10 @@ EOT;
 
         $columns[] = (integer) $this->app_settings->getGlobal('max_items');
 
-        // Try to get records from Cache.
-        $cache->context('searches');
-
-        $key = $cache->key(
-            __METHOD__
-            . serialize([$search, $collection, $orderby, $project_id, $this->visibleItems()])
-        );
-
-        // Debug.
-//        $cache->delete($key);
-
-        // Last modified.
-        $sql_modified = <<<SQL
-SELECT changed_time
-    FROM stats
-    WHERE table_name = 'ind_items' 
-SQL;
-
-        $this->db_main->run($sql_modified);
-        $modified = strtotime($this->db_main->getResult());
-
-        // Get items from cache.
-        $rows = $cache->get($key, $modified);
-
-        // Cache is empty.
-        if (empty($rows)) {
-
-            // Execute search.
-            $this->db_main->run($sql, $columns);
-            $rows = $this->db_main->getResultRows();
-
-            // Save to cache.
-            $cache->set($key, $rows, $modified);
-        }
+        // Not cached: the answer depends on the user's access, clipboard and projects, which change without the index
+        // changing, and the query takes milliseconds.
+        $this->db_main->run($sql, $columns);
+        $rows = $this->db_main->getResultRows();
 
         if (empty($rows)) {
 
@@ -2091,8 +1964,9 @@ EOT;
 
             } else {
 
-                $normalized_uids[] = $uid;
-                $placeholder_arr[] = 'uid = ?';
+                // A DOI is case-insensitive; the other identifiers are compared as they are.
+                $normalized_uids[] = strpos($uid, '10.') === 0 ? strtolower($uid) : $uid;
+                $placeholder_arr[] = strpos($uid, '10.') === 0 ? 'lower(uid) = ?' : 'uid = ?';
             }
         }
 

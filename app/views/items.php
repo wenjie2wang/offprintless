@@ -208,7 +208,7 @@ class ItemsView extends TextView {
         $el = $this->di->get('Modal');
 
         $el->id('modal-quick-search');
-        $el->header($this->lang->t9n('Search ' . $modal_header));
+        $el->header($this->searchDialogTitle($collection, $input));
         $el->button($searches_button);
         $el->button($advanced_button);
         $el->body($this->sharedQuickSearch($action), 'bg-darker-5');
@@ -244,7 +244,7 @@ class ItemsView extends TextView {
         $el = $this->di->get('Modal');
 
         $el->id('modal-advanced-search');
-        $el->header('Search ' . $modal_header);
+        $el->header($this->searchDialogTitle($collection, $input));
         $el->button($searches_button);
         $el->button($button);
         $el->button($search_button);
@@ -287,6 +287,29 @@ class ItemsView extends TextView {
     public function filteredPage(string $collection, array $get, array $input): string {
 
         return $this->page($collection, $get, $input, true);
+    }
+
+    /**
+     * The heading of the search dialogs: what is searched. In a project it names the project, so that a search from
+     * inside a project is not mistaken for a search of the whole library.
+     *
+     * @param string $collection
+     * @param array $input
+     * @return string
+     */
+    private function searchDialogTitle(string $collection, array $input): string {
+
+        switch ($collection) {
+
+            case 'project':
+                return sprintf($this->lang->t9n('Search in project %s'), $input['project'] ?? '');
+
+            case 'clipboard':
+                return $this->lang->t9n('Search clipboard');
+
+            default:
+                return $this->lang->t9n('Search library');
+        }
     }
 
     /**
@@ -344,10 +367,29 @@ class ItemsView extends TextView {
         $el = null;
 
         // Item count.
+        $notes_html = '';
 
         if (empty($input['total_count'])) {
 
             $item_count = "<div class=\"text-muted w-100 pb-3 pb-lg-0\">{$this->lang->t9n('No items')}</div>";
+
+            // After a search, say what to try. Words match as whole words, which is the usual reason for no result.
+            if (isset($get['search_type'])) {
+
+                $hints = [
+                    $this->lang->t9n('Words match as whole words: use a * to match a beginning or an end, for example estim*.'),
+                    $this->lang->t9n('Try fewer or different words, or the OR option.'),
+                    $this->lang->t9n('Author names can be written in any order.')
+                ];
+
+                if ($collection !== 'library') {
+
+                    array_unshift($hints, $this->lang->t9n('This searches only this project or clipboard. Search the library to look everywhere.'));
+                }
+
+                $notes_html = '<div class="alert alert-info mb-3"><b>' . $this->lang->t9n('No results. Things to try:') . '</b><ul class="mb-0 pl-3"><li>' .
+                    join('</li><li>', $hints) . '</li></ul></div>';
+            }
 
         } else {
 
@@ -368,6 +410,13 @@ class ItemsView extends TextView {
             // Put together the item counter.
             $item_count = '<div class="text-muted w-100 pb-3 pb-lg-0">' .
                 sprintf($this->lang->t9n('Items %s of %s'), $from . ' - ' . $last, $total_count) . '</div>';
+
+            // A search returns at most max_items results. When it reached the limit, there are more than are listed.
+            if (isset($get['search_type']) && (int) $input['total_count'] >= (int) $this->app_settings->getGlobal('max_items')) {
+
+                $notes_html = '<div class="alert alert-warning mb-3">' .
+                    sprintf($this->lang->t9n('Only the first %s results are listed. Narrow the search to see the rest.'), $total_count) . '</div>';
+            }
         }
 
         $tags_html = '';
@@ -493,6 +542,11 @@ EOT;
         if ($tags_html !== '') {
 
             $el->column($tags_html, 'col-12');
+        }
+
+        if ($notes_html !== '') {
+
+            $el->column($notes_html, 'col-12');
         }
 
         $row = $el->render();

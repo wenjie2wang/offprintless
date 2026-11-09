@@ -26,6 +26,19 @@ for ($i = 1; $i <= 1489; $i++) {
 }
 $pdo->commit();
 
+// Production's state for authors: 4464 authors, 1488 items with one or two of them, 608 authors that nothing uses, and
+// no triggers on items_authors (the old upgrade step dropped them).
+$pdo->exec("DROP TRIGGER IF EXISTS items_authors_ad");
+$pdo->exec("DROP TRIGGER IF EXISTS ind_items_authors_ai");
+$pdo->exec("DROP TRIGGER IF EXISTS ind_items_authors_ad");
+$pdo->beginTransaction();
+for ($a = 1; $a <= 4464; $a++) { $pdo->exec("INSERT INTO authors (id,first_name,last_name) VALUES ($a,'First$a','Last$a')"); }
+for ($i = 1; $i <= 1488; $i++) {
+    $pdo->exec("INSERT INTO items_authors (item_id,author_id,position) VALUES ($i," . (($i * 2) % 3856 + 1) . ",1)");
+}
+$pdo->commit();
+$orphans_before = (int) $pdo->query("SELECT count(*) FROM authors WHERE id NOT IN (SELECT author_id FROM items_authors)")->fetchColumn();
+
 $before = (int) $pdo->query("SELECT count(*) FROM items")->fetchColumn();
 $t0 = microtime(true);
 $pdo->beginTransaction();
@@ -33,8 +46,20 @@ $pdo->exec(file_get_contents(__DIR__ . '/../app/media/main_update_3.sql'));
 $pdo->commit();
 $ms = round((microtime(true) - $t0) * 1000);
 
+$t1 = microtime(true);
+$pdo->beginTransaction();
+$pdo->exec(file_get_contents(__DIR__ . '/../app/media/main_update_4.sql'));
+$pdo->commit();
+$ms4 = round((microtime(true) - $t1) * 1000);
+
 $q = fn($sql) => $pdo->query($sql)->fetchColumn();
 $checks = [
+    'the author-index repair ran in under 5 seconds' => $ms4 < 5000,
+    'the three triggers are back' => (int) $q("SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name IN ('items_authors_ad','ind_items_authors_ai','ind_items_authors_ad')") === 3,
+    'every item with an author is indexed' => (int) $q("SELECT count(*) FROM ind_items WHERE id IN (SELECT item_id FROM items_authors) AND (authors_index IS NULL OR trim(authors_index) = '')") === 0,
+    'authors nothing uses were removed' => (int) $q("SELECT count(*) FROM authors WHERE id NOT IN (SELECT author_id FROM items_authors)") === 0 && $orphans_before > 0,
+    'no author in use was removed' => (int) $q("SELECT count(DISTINCT author_id) FROM items_authors") === (int) $q("SELECT count(*) FROM authors"),
+    'no item was touched by the repair' => (int) $q("SELECT count(*) FROM items") === $before,
     'upgrade ran' => $ms >= 0,
     'no item lost' => (int) $q("SELECT count(*) FROM items") === $before,
     'no project lost (32 + Public)' => (int) $q("SELECT count(*) FROM projects") === 33,

@@ -41,5 +41,8 @@ final class Installation {
 
         // Project-based access model: roles, Public project.
         $this->model->createProjectAccessModel();
+
+        // The author search index and the triggers that keep it, which an old upgrade step dropped.
+        $this->model->restoreAuthorIndex();
     }
 }

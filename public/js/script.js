@@ -1896,33 +1896,69 @@ class ItemsMainView extends View {
         });
     }
     /**
-     * Only free version.
+     * Mark the searched words in the listed items. Works on text nodes inside the item list only, so the sidebar and the
+     * forms are untouched, and it does not switch the page into edit mode.
      */
     highlightSearch() {
-        if (location.hash.indexOf('search_query') > -1 && $('.item-container').length > 0) {
-            let uri = new URL('http://foo.bar/' + location.hash.substr(1));
-            document.designMode = 'on';
-            var sel = window.getSelection();
-            for (let p of uri.searchParams) {
-                if (p[0].indexOf('search_query') === 0) {
-                    let terms = p[1].split(' ');
-                    for (let t of terms) {
-                        sel.collapse(document.getElementsByClassName('item-container')[0], 0);
-                        t = t.replace('*', '').replace('%2A', '');
-                        if (t.length > 1) {
-                            while (window.find(t, false)) {
-                                document.execCommand('hiliteColor', false, '#ffff9bbf');
-                                document.execCommand('foreColor', false, '#222426');
-                            }
-                        }
-                    }
+        if (location.hash.indexOf('search_query') < 0 || $('.item-container').length === 0) {
+            return;
+        }
+        let uri = new URL('http://foo.bar/' + location.hash.substr(1)), words = [];
+        for (let p of uri.searchParams) {
+            if (p[0].indexOf('search_query') !== 0) {
+                continue;
+            }
+            // Quoted phrases stay together; NOT words and -words are not highlighted.
+            let skip = false;
+            (p[1].match(/"[^"]*"|\S+/g) || []).forEach(function (t) {
+                if (/^not$/i.test(t)) {
+                    skip = true;
+                    return;
+                }
+                if (skip || t.charAt(0) === '-') {
+                    skip = false;
+                    return;
+                }
+                t = t.replace(/^"|"$/g, '').replace(/\*/g, '');
+                if (t.length > 1) {
+                    words.push(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+                }
+            });
+        }
+        if (words.length === 0) {
+            return;
+        }
+        let pattern = new RegExp('(' + words.join('|') + ')', 'gi');
+        $('.item-container').each(function () {
+            let walker = document.createTreeWalker(this, NodeFilter.SHOW_TEXT, null), nodes = [], n;
+            while ((n = walker.nextNode())) {
+                if (n.parentNode.nodeName !== 'SCRIPT' && n.parentNode.nodeName !== 'STYLE' && n.parentNode.nodeName !== 'MARK') {
+                    nodes.push(n);
                 }
             }
-            sel.collapseToEnd();
-            document.designMode = 'off';
-            sel.removeAllRanges();
-            $('#top-row').scrollTop(0);
-        }
+            nodes.forEach(function (node) {
+                pattern.lastIndex = 0;
+                if (!pattern.test(node.nodeValue)) {
+                    return;
+                }
+                let frag = document.createDocumentFragment(), text = node.nodeValue, last = 0, m;
+                pattern.lastIndex = 0;
+                while ((m = pattern.exec(text)) !== null) {
+                    frag.appendChild(document.createTextNode(text.substring(last, m.index)));
+                    let mark = document.createElement('mark');
+                    mark.className = 'px-0';
+                    mark.appendChild(document.createTextNode(m[0]));
+                    frag.appendChild(mark);
+                    last = m.index + m[0].length;
+                    if (m[0].length === 0) {
+                        pattern.lastIndex++;
+                    }
+                }
+                frag.appendChild(document.createTextNode(text.substring(last)));
+                node.parentNode.replaceChild(frag, node);
+            });
+        });
+        $('#top-row').scrollTop(0);
     }
 }
 

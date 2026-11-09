@@ -145,7 +145,11 @@ HTML
         $el->id('quick-search-form');
         $el->method('GET');
         $el->action(isset($action) ? $action : '#items/main');
-        $el->append("$search_input $search_boolean $search_type $save_search");
+        $help = '<small class="form-text text-muted mb-2">' .
+            $this->lang->t9n('Whole words. Use * for a beginning or end (estim*), "quotes" for a phrase, NOT or - to leave a word out.') .
+            '</small>';
+
+        $el->append("$search_input $help $search_boolean $search_type $save_search");
         $quick_search_form = $el->render();
 
         $el = null;

@@ -13,6 +13,7 @@ use PDO;
  * @method void createTables(bool $force = false)
  * @method void updateItemsAuthorsPrimaryIndex()
  * @method void createProjectAccessModel()
+ * @method void restoreAuthorIndex()
  */
 class InstallationModel extends Model {
 
@@ -227,6 +228,48 @@ class InstallationModel extends Model {
             /** @var PDO $pdo */
             $pdo = $this->db_main->getPDO();
             $pdo->exec($sql);
+        }
+
+        $this->db_main->close();
+    }
+
+    /**
+     * Restore the triggers that keep the author search index, which an old upgrade step dropped, and index the authors
+     * of existing items. Safe to run on every start: it does nothing once the triggers exist.
+     *
+     * @throws Exception
+     */
+    protected function _restoreAuthorIndex(): void {
+
+        $this->db_main = $this->di->get('Db_main');
+        $this->db_main->connect();
+
+        $this->db_main->run("SELECT count(*) FROM sqlite_master WHERE type = 'trigger' AND name IN ('items_authors_ad', 'ind_items_authors_ai', 'ind_items_authors_ad')");
+        $present = (int) $this->db_main->getResult();
+
+        if ($present < 3) {
+
+            $sql_file = IL_APP_PATH . DIRECTORY_SEPARATOR . 'media' . DIRECTORY_SEPARATOR . 'main_update_4.sql';
+
+            if (is_readable($sql_file) === false) {
+
+                throw new Exception("update failed: could not read the <kbd>$sql_file</kbd> file");
+            }
+
+            /** @var PDO $pdo */
+            $pdo = $this->db_main->getPDO();
+            $pdo->beginTransaction();
+
+            try {
+
+                $pdo->exec(file_get_contents($sql_file));
+                $pdo->commit();
+
+            } catch (\Throwable $exc) {
+
+                $pdo->rollBack();
+                throw $exc;
+            }
         }
 
         $this->db_main->close();
