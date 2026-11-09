@@ -632,13 +632,13 @@ EOT
 
                 $el = null;
 
-                // Access model: members get a role dropdown; the owner can change it and save. The owner's own
-                // row is not listed here (the owner is never in this list) and 'owner' cannot be chosen.
+                // Access model: members get a role dropdown; owners can change it and save. A project may have
+                // several owners; the acting owner's own row is not listed here.
                 $role_select = '';
 
                 if ($checked === true) {
 
-                    $current_role = $user['role'] === 'viewer' ? 'viewer' : 'editor';
+                    $current_role = in_array($user['role'], ['viewer', 'owner'], true) ? $user['role'] : 'editor';
                     $hash_attr = $this->sanitation->attr($user['id_hash']);
 
                     /** @var Bootstrap\Select $el */
@@ -650,6 +650,7 @@ EOT
                     $el->componentSize('small');
                     $el->option($this->lang->t9n('Editor'), 'editor', $current_role === 'editor');
                     $el->option($this->lang->t9n('Viewer'), 'viewer', $current_role === 'viewer');
+                    $el->option($this->lang->t9n('Owner'), 'owner', $current_role === 'owner');
                     $role_select = $el->render();
 
                     $el = null;
@@ -690,6 +691,7 @@ EOT
         $el->label($this->lang->t9n('Role of invited users'));
         $el->option($this->lang->t9n('Editor: can add, change and remove items'), 'editor', true);
         $el->option($this->lang->t9n('Viewer: read-only'), 'viewer', false);
+        $el->option($this->lang->t9n('Owner: also manages the project and its members'), 'owner', false);
         $role_select = $el->render();
 
         $el = null;

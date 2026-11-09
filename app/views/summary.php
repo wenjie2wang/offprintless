@@ -732,7 +732,7 @@ UIDS;
         $el = $this->di->get('Descriptionlist');
         $el->addClass('mb-3');
         $el->term($this->lang->t9n('Added'), 'col-sm-1 ml-4');
-        $el->description("{$added_time}, {$item['name']}", 'col-sm-10 ml-4');
+        $el->description(trim("{$added_time}, {$item['name']}", ', '), 'col-sm-10 ml-4');
 
         $dl = $el->render();
 

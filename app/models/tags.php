@@ -334,13 +334,16 @@ EOT;
         $abstract = $row['abstract'];
 
         // List of all tags.
-        $sql = <<<'EOT'
-SELECT id, tag
+        $sql = <<<EOT
+SELECT DISTINCT tags.id, tags.tag
     FROM tags
-    ORDER BY tag COLLATE utf8Collation
+    INNER JOIN items_tags ON tags.id = items_tags.tag_id
+    WHERE items_tags.item_id IN ({$this->visibleItems()})
+       OR tags.id IN (SELECT tag_id FROM items_tags WHERE item_id = ?)
+    ORDER BY tags.tag COLLATE utf8Collation
 EOT;
 
-        $this->db_main->run($sql);
+        $this->db_main->run($sql, [$item_id]);
         $output['tags'] = $this->db_main->getResultRows(PDO::FETCH_KEY_PAIR);
 
         // List of item tags.
@@ -361,10 +364,11 @@ EOT;
         $placeholders = join(',', $placeholder_arr);
 
         $sql = <<<EOT
-SELECT id, tag
+SELECT DISTINCT tags.id, tags.tag
     FROM tags
-    WHERE tag IN ($placeholders)
-    ORDER BY tag COLLATE utf8Collation
+    INNER JOIN items_tags ON tags.id = items_tags.tag_id
+    WHERE tags.tag IN ($placeholders) AND items_tags.item_id IN ({$this->visibleItems()})
+    ORDER BY tags.tag COLLATE utf8Collation
 EOT;
 
         $this->db_main->run($sql, $columns);

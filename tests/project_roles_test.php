@@ -31,7 +31,7 @@ check('invited users get the chosen role', [$role($pid, $bobId), $role($pid, $ca
 $as($aliceH, 'U');
 $app->model('ProjectModel')->create(['name' => 'Sneaky', 'access' => 'restricted', 'users' => [$bobH], 'role' => 'owner']);
 $sid = (int) $app->sql("SELECT id FROM projects WHERE project='Sneaky'")[0]['id'];
-check('a posted role of owner is downgraded (no escalation)', $role($sid, $bobId), 'editor');
+check('a posted role of owner makes a co-owner', $role($sid, $bobId), 'owner');
 
 echo "--- who may change a project ---\n";
 $as($bobH, 'U');

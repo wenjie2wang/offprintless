@@ -315,8 +315,8 @@ EOT;
             [$project_id, $this->user_id]
         );
 
-        // Invited users. Never trust a posted role of 'owner'; the owner is the creator.
-        $role = ($project['role'] ?? 'editor') === 'viewer' ? 'viewer' : 'editor';
+        // Invited users. The creator is always an owner; others get the posted role (owner = co-owner).
+        $role = in_array($project['role'] ?? '', ['viewer', 'editor', 'owner'], true) ? $project['role'] : 'editor';
 
         $invited = array_merge((array) ($project['users'] ?? []), $this->usernamesToHashes($project['invite'] ?? ''));
 
@@ -362,8 +362,10 @@ EOT;
             );
         }
 
-        // Members. Merge, do not wipe: keep existing roles and the owner, add new people, remove unticked ones.
-        $role = ($project['role'] ?? 'editor') === 'viewer' ? 'viewer' : 'editor';
+        // Members. Merge, do not wipe: keep existing roles, add new people, remove unticked ones.
+        // The acting user is never touched by their own save (the form does not list them).
+        // A project may have several owners; it can never be left with none.
+        $role = in_array($project['role'] ?? '', ['viewer', 'editor', 'owner'], true) ? $project['role'] : 'editor';
         $wanted = array_values(array_unique(array_merge(
             (array) ($project['users'] ?? []),
             $this->usernamesToHashes($project['invite'] ?? '')
@@ -371,13 +373,14 @@ EOT;
 
         $this->db_main->run(
             'SELECT users.id_hash FROM projects_users INNER JOIN users ON users.id = projects_users.user_id
-                WHERE projects_users.project_id = ? AND projects_users.role != ?',
-            [$project_id, 'owner']
+                WHERE projects_users.project_id = ? AND users.id != ?',
+            [$project_id, $this->user_id]
         );
         $current = $this->db_main->getResultRows(PDO::FETCH_COLUMN);
 
         foreach (array_diff($current, $wanted) as $id_hash) {
 
+            // Owners are never dropped by leaving them out of the list; demote them explicitly instead.
             $this->db_main->run(
                 "DELETE FROM projects_users WHERE project_id = ? AND role != 'owner'
                     AND user_id = (SELECT id FROM users WHERE id_hash = ?)",
@@ -385,27 +388,25 @@ EOT;
             );
         }
 
-        // Per-member roles posted as roles[<id_hash>] = viewer|editor. Anything else is ignored: 'owner' can never
-        // be granted here, and an unknown or malformed value must not change a role.
+        // Per-member roles posted as roles[<id_hash>] = viewer|editor|owner. Anything else is ignored.
         $posted_roles = is_array($project['roles'] ?? null) ? $project['roles'] : [];
-        $role_of = function ($id_hash) use ($posted_roles, $role) {
+        $role_of = function ($id_hash) use ($posted_roles) {
 
             $wanted_role = $posted_roles[$id_hash] ?? null;
 
-            return ($wanted_role === 'viewer' || $wanted_role === 'editor') ? $wanted_role : null;
+            return in_array($wanted_role, ['viewer', 'editor', 'owner'], true) ? $wanted_role : null;
         };
 
         foreach (array_diff($wanted, $current) as $id_hash) {
 
             $this->db_main->run(
-                "INSERT OR IGNORE INTO projects_users (project_id, user_id, role)
-                    SELECT ?, id, ? FROM users WHERE id_hash = ? AND id NOT IN
-                        (SELECT user_id FROM projects_users WHERE project_id = ? AND role = 'owner')",
-                [$project_id, $role_of($id_hash) ?? $role, $id_hash, $project_id]
+                'INSERT OR IGNORE INTO projects_users (project_id, user_id, role)
+                    SELECT ?, id, ? FROM users WHERE id_hash = ? AND id != ?',
+                [$project_id, $role_of($id_hash) ?? $role, $id_hash, $this->user_id]
             );
         }
 
-        // Change the role of people who are (still) members. Never touches the owner row.
+        // Change the role of people who are (still) members.
         foreach (array_intersect($wanted, $current) as $id_hash) {
 
             $new_role = $role_of($id_hash);
@@ -416,11 +417,19 @@ EOT;
             }
 
             $this->db_main->run(
-                "UPDATE projects_users SET role = ?
-                    WHERE project_id = ? AND role != 'owner'
-                    AND user_id = (SELECT id FROM users WHERE id_hash = ?)",
+                'UPDATE projects_users SET role = ?
+                    WHERE project_id = ? AND user_id = (SELECT id FROM users WHERE id_hash = ?)',
                 [$new_role, $project_id, $id_hash]
             );
+        }
+
+        // Never leave a project without an owner.
+        $this->db_main->run("SELECT count(*) FROM projects_users WHERE project_id = ? AND role = 'owner'", [$project_id]);
+
+        if ((int) $this->db_main->getResult() === 0 && $is_public === false) {
+
+            $this->db_main->rollBack();
+            throw new Exception('a project needs at least one owner', 422);
         }
 
         $this->db_main->commit();
@@ -591,6 +600,18 @@ EOT;
         if (ProjectAccess::atLeast($this->projectRole($project_id), 'owner') === false) {
 
             throw new Exception('you are not authorized to delete this project', 403);
+        }
+
+        // Items live only in projects: refuse to strand items whose only project is this one.
+        $this->db_main->run(
+            'SELECT count(*) FROM projects_items pi WHERE pi.project_id = ?
+                AND NOT EXISTS (SELECT 1 FROM projects_items o WHERE o.item_id = pi.item_id AND o.project_id != pi.project_id)',
+            [$project_id]
+        );
+
+        if ((int) $this->db_main->getResult() > 0) {
+
+            throw new Exception('this project holds items that exist nowhere else; move or delete them first', 422);
         }
 
         $sql = <<<EOT

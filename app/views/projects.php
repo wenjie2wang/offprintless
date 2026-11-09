@@ -66,7 +66,6 @@ class ProjectsView extends TextView {
         /** @var Bootstrap\Input $el */
         $el = $this->di->get('Input');
 
-        $el->checked('checked');
         $el->id('project-access-1');
         $el->type('radio');
         $el->inline(true);
@@ -91,6 +90,7 @@ class ProjectsView extends TextView {
         /** @var Bootstrap\Input $el */
         $el = $this->di->get('Input');
 
+        $el->checked('checked');
         $el->id('project-access-2');
         $el->type('radio');
         $el->inline(true);
@@ -155,6 +155,7 @@ class ProjectsView extends TextView {
         $el->label($this->lang->t9n('Role of invited users'));
         $el->option($this->lang->t9n('Editor: can add, change and remove items'), 'editor', true);
         $el->option($this->lang->t9n('Viewer: read-only'), 'viewer', false);
+        $el->option($this->lang->t9n('Owner: also manages the project and its members'), 'owner', false);
         $role_select = $el->render();
 
         $el = null;

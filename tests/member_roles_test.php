@@ -40,13 +40,14 @@ check('dan joins as editor and eve as viewer in one save', [$role($pid, $danId),
 
 echo "--- what a role change must NOT be able to do ---\n";
 $save($pid, ['users' => [$bobH, $carolH, $danH, $eveH], 'roles' => [$bobH => 'owner']]);
-check('a posted role of owner is ignored (no promotion to owner)', $role($pid, $bobId), 'viewer');
+check('a posted role of owner promotes to co-owner', $role($pid, $bobId), 'owner');
+$save($pid, ['users' => [$bobH, $carolH, $danH, $eveH], 'roles' => [$bobH => 'viewer']]);
 
 $save($pid, ['users' => [$bobH, $carolH, $danH, $eveH], 'roles' => [$bobH => 'superuser', $carolH => '', $danH => ['x']]]);
 check('invalid role values are ignored', [$role($pid, $bobId), $role($pid, $carolId), $role($pid, $danId)], ['viewer', 'editor', 'editor']);
 
 $save($pid, ['users' => [$bobH, $carolH, $danH, $eveH], 'roles' => [$aliceH => 'viewer']]);
-check("the owner's own row cannot be downgraded", $role($pid, $aliceId), 'owner');
+check("the acting owner's own row is not touched by their save", $role($pid, $aliceId), 'owner');
 
 $before = (int) $app->sql('SELECT count(*) c FROM projects_users WHERE project_id=?', [$pid])[0]['c'];
 $save($pid, ['users' => [$bobH, $carolH, $danH, $eveH], 'roles' => ['not-a-real-hash' => 'editor']]);

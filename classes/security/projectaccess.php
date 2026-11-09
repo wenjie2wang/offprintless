@@ -86,6 +86,7 @@ SQL;
         $this->db->run($sql, [$user_id, $item_id, $item_id]);
 
         $best = null;
+        $explicit = false;
 
         foreach ($this->db->getResultRows(\PDO::FETCH_COLUMN) as $role) {
 
@@ -95,10 +96,18 @@ SQL;
             }
         }
 
-        // The person who added an item may finish it, even where they are only a viewer (e.g. the Public project:
-        // creators may add there but are not editors of other people's items). This applies only while they can
-        // still see the item, so moving it into a project they are not in takes the right away.
-        if ($best !== null && self::atLeast($best, 'editor') === false) {
+        // Does any project containing the item hold an explicit membership row for the user?
+        $this->db->run(
+            'SELECT count(*) FROM projects_items pi INNER JOIN projects_users pu
+                ON pu.project_id = pi.project_id AND pu.user_id = ? WHERE pi.item_id = ?',
+            [$user_id, $item_id]
+        );
+        $explicit = (int) $this->db->getResult() > 0;
+
+        // The person who added an item may finish it where they only see it through the Public project (creators
+        // may add there but are not editors of other people's items). An explicit membership always wins, so
+        // demoting someone to viewer really takes their edit rights away.
+        if ($best !== null && $explicit === false && self::atLeast($best, 'editor') === false) {
 
             $this->db->run('SELECT count(*) FROM items WHERE id = ? AND added_by = ?', [$item_id, $user_id]);
 

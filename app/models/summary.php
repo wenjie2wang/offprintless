@@ -193,6 +193,12 @@ EOT;
             $this->db_main->run($sql, [$item_id]);
             $output = $this->db_main->getResultRow();
 
+            // Who added an item is for admins only.
+            if ($this->permissions !== 'A') {
+
+                $output['name'] = '';
+            }
+
             // Urls.
             $urls = explode('|', (string) $output[ItemMeta::COLUMN['URLS']]);
             $output[ItemMeta::COLUMN['URLS']] = $urls;

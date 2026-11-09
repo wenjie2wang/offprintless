@@ -56,13 +56,19 @@ class AppModel extends Model {
     private function getUserIdAndPermissions(string $id_hash): void {
 
         $sql = <<<'SQL'
-SELECT id, permissions
+SELECT id, permissions, status
     FROM users
     WHERE id_hash = ?
 SQL;
 
         $this->db_main->run($sql, [$id_hash]);
         $row = $this->db_main->getResultRow();
+
+        // A suspended or deleted account stops working at once, even with a session that is still open.
+        if (empty($row) || $row['status'] !== 'A') {
+
+            throw new \Exception('this account is not active', 403);
+        }
 
         $this->id_hash = $id_hash;
         $this->user_id = $row['id'];

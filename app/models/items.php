@@ -157,7 +157,7 @@ EOT;
 SELECT items.id as item_id
     FROM items
     INNER JOIN clipboard ON items.id=clipboard.item_id
-    WHERE clipboard.user_id = ?
+    WHERE clipboard.user_id = ? AND items.id IN ({$this->visibleItems()})
     ORDER BY $order
     LIMIT ? OFFSET ?
 EOT;
@@ -250,7 +250,7 @@ EOT;
                 $sql = <<<EOT
 SELECT count(*)
     FROM clipboard
-    WHERE user_id = ?
+    WHERE user_id = ? AND item_id IN ({$this->visibleItems()})
 EOT;
 
                 $columns = [
@@ -485,7 +485,7 @@ EOT;
             $sqls[] = <<<EOT
 SELECT items.id AS item_id, items.publication_date, items.title
     FROM items INNER JOIN clipboard ON items.id=clipboard.item_id
-    WHERE clipboard.user_id = ?
+    WHERE clipboard.user_id = ? AND items.id IN ({$this->visibleItems()})
 EOT;
 
             $columns[] = $this->user_id;
@@ -2435,6 +2435,21 @@ DELETE
     FROM projects_items
     WHERE project_id = ? AND item_id = ?
 EOT;
+
+        // An item lives only in projects: never remove it from the last one.
+        foreach ($item_ids as $item_id) {
+
+            $this->db_main->run(
+                'SELECT count(*) FROM projects_items WHERE item_id = ? AND project_id != ?',
+                [$item_id, $project_id]
+            );
+
+            if ((int) $this->db_main->getResult() === 0) {
+
+                $this->db_main->rollBack();
+                throw new Exception('an item must stay in at least one project; add it to another project first, or delete it', 422);
+            }
+        }
 
         foreach ($item_ids as $item_id) {
 
