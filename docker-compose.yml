@@ -9,7 +9,7 @@
 #
 # BACK UP FIRST. The new version upgrades the database schema on first start and
 # the old 5.11.x image cannot necessarily read it afterwards:
-#     docker stop i-librarian
+#     docker stop i-librarian        # the old container (this one is named offprintless)
 #     sudo cp -a /media/docker-services/i-librarian/database /media/docker-services/i-librarian/database.bak-$(date +%F)
 services:
   app:
@@ -19,7 +19,7 @@ services:
       args:
         TIMEZONE: America/New_York
     image: offprintless:project-access
-    container_name: i-librarian          # keeps the current container name, so stop/remove the old one first
+    container_name: offprintless         # the old container is named i-librarian: stop and remove it first, so stop/remove the old one first
     ports:
       - "8185:80"                        # same host port as before; the cloudflare tunnel keeps working
     volumes:
