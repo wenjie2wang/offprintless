@@ -1087,14 +1087,14 @@ class SettingsView extends TextView {
         $version = AiConsent::VERSION;
         $title = $this->lang->t9n('AI features');
         $label = $this->lang->t9n('Turn on AI features for my account');
-        $note = $this->lang->t9n('Off by default. Turning them on asks you to acknowledge a notice about the text of your PDFs.');
+        $note = $this->lang->t9n('Off by default. Turning them on means you allow the text of your PDFs to be sent to an outside AI service, after you acknowledge a notice.');
         $since = $on && !empty($user_settings['ai_ack_at'])
             ? '<div class="text-muted small">' . $this->lang->t9n('Acknowledged') . ' ' . htmlspecialchars((string) $user_settings['ai_ack_at']) . '</div>'
             : '';
 
         $notice = [
-            'Some features send text taken from your PDFs, such as the title, the abstract and passages, to an AI service.',
-            'If the service is run by another company (a cloud provider), that text leaves this server and is processed under that company\'s terms.',
+            'By accepting this notice you allow this application to send the text of your PDFs, such as the title, the abstract and passages of the full text, to the AI service that the administrator has set up, whenever you use an AI feature.',
+            'If that service is run by another company (a cloud provider), the text leaves this server and is processed under that company\'s terms. Once it has been sent it cannot be taken back.',
             'Journal articles are usually protected by copyright and by the license or subscription through which you obtained them. Many publishers restrict copying the text to third parties, and some forbid it for AI use. Whether sending it is allowed is your responsibility, not this application\'s.',
             'You and your institution may be bound by agreements with publishers, funders or employers that apply. Do not turn this on for material you are not allowed to share with an outside service.',
             'A service on your own computer or network (a local model) does not send text to a third party. Ask your administrator which kind this server uses.',
@@ -1109,7 +1109,7 @@ class SettingsView extends TextView {
 
         $cancel = $this->lang->t9n('Cancel');
         $accept = $this->lang->t9n('Turn on');
-        $ack = $this->lang->t9n('I have read this notice and accept the risk.');
+        $ack = $this->lang->t9n('I have read this notice, I allow my PDFs to be sent to an outside AI service, and I accept the risk.');
         $heading = $this->lang->t9n('Before you turn on AI features');
 
         return <<<EOT

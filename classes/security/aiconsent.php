@@ -20,7 +20,7 @@ final class AiConsent {
     /**
      * Version of the notice text in the settings page. Change it with the text.
      */
-    public const VERSION = '1';
+    public const VERSION = '2';
 
     /**
      * May AI features run for a user with these settings?
