@@ -12,7 +12,7 @@ use Librarian\Container\DependencyInjector;
  *   data: {"t":"piece"}            one per piece of the answer
  *   data: {"done":{...}}           at the end: citations, usage, meter
  *   data: {"error":"message"}      when something failed (also for errors before the first piece)
- * history: GET item_id. This user's earlier messages about the item.
+ * Page and history: GET id (the item). This user's earlier messages about the item.
  */
 class ChatController extends AppController {
 
@@ -35,7 +35,7 @@ class ChatController extends AppController {
      */
     public function mainAction(): string {
 
-        $item_id = $this->itemId($this->get);
+        $item_id = $this->itemId($this->get, 'id');
 
         \Librarian\Ai\AiGate::check($this->app_settings->getGlobal(), $this->app_settings->getUser(), true);
 
@@ -53,7 +53,7 @@ class ChatController extends AppController {
      */
     public function historyAction(): string {
 
-        $item_id = $this->itemId($this->get);
+        $item_id = $this->itemId($this->get, 'id');
 
         $model = new ChatModel($this->di);
         $messages = $model->history($item_id);
@@ -123,15 +123,18 @@ class ChatController extends AppController {
      * @return int
      * @throws Exception
      */
-    private function itemId(array $source): int {
+    /**
+     * Pages and reads carry the item as id (like every item page, so the side menu keeps it); the POST body calls it item_id.
+     */
+    private function itemId(array $source, string $name = 'item_id'): int {
 
-        if (!isset($source['item_id'])) {
+        if (!isset($source[$name])) {
 
-            throw new Exception('the parameter item_id is required', 400);
+            throw new Exception("the parameter $name is required", 400);
         }
 
-        $this->validation->id($source['item_id']);
+        $this->validation->id($source[$name]);
 
-        return (int) $source['item_id'];
+        return (int) $source[$name];
     }
 }

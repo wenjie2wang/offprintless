@@ -110,5 +110,13 @@ $app->di->getShared('AppSettings')->setGlobal($global);
 echo "--- empty question ---\n";
 check('an empty question is refused (422)', code(fn() => $ask('   ')) === 422);
 
+echo "--- the page and reads take the item as id, like every item page ---\n";
+$src = file_get_contents(__DIR__ . '/../app/controllers/chat.php');
+check('mainAction reads id from the URL', preg_match("/function mainAction.*?itemId\(\\\$this->get, 'id'\)/s", $src) === 1);
+check('historyAction reads id from the URL', preg_match("/function historyAction.*?itemId\(\\\$this->get, 'id'\)/s", $src) === 1);
+check('sendAction reads item_id from the form', preg_match("/function sendAction.*?itemId\(\\\$this->post\)/s", $src) === 1);
+$js = file_get_contents(__DIR__ . '/../public/js/script.js');
+check('the page script asks for history with id', str_contains($js, "index.php/chat/history?id="));
+
 echo $fails === 0 ? "\nALL PASSED\n" : "\n$fails FAILED\n";
 exit($fails === 0 ? 0 : 1);

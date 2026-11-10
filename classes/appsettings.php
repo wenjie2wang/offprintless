@@ -207,7 +207,8 @@ final class AppSettings {
                 throw new Exception("user settings not saved in the session", 500);
             }
 
-            $this->settings['user'] = $session->data('settings');
+            // A session opened before an upgrade lacks the settings that the upgrade added; they start at their defaults.
+            $this->settings['user'] = array_merge($this->default_user_settings, $session->data('settings'));
         }
 
         // Return requesting setting(s).

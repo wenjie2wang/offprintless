@@ -43,5 +43,12 @@ preg_match('/class NotebookMainView.*?views\.notebookmain/s', $src, $nb); preg_m
 check('the notebook view never calls .html(', preg_match('/\.html\(/', $nb[0] ?? ''), 0);
 check('the chat view never calls .html(', preg_match('/\.html\(/', $ch[0] ?? ''), 0);
 
+// The "Test connection" button on Global settings must be wired in both files, and must show the result as text.
+foreach (['src' => $src, 'min' => $min] as $label => $code) {
+    check("Test connection button has a handler ($label)", [str_contains($code, "#ai-test"), str_contains($code, 'index.php/ai/test')], [true, true]);
+}
+preg_match('/class GlobalSettingsMainView.*?views\.globalsettingsmain/s', $src, $gs);
+check('the settings view writes the test result as text, never .html(', [str_contains($gs[0] ?? '', "#ai-test-result"), preg_match('/\.html\(/', $gs[0] ?? '')], [true, 0]);
+
 echo $fails === 0 ? "\nALL PASSED\n" : "\n$fails FAILED\n";
 exit($fails === 0 ? 0 : 1);

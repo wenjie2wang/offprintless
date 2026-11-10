@@ -2940,7 +2940,7 @@ class ChatMainView extends View {
             itemview.clickTitle();
             itemview.changeTitleLink();
         }
-        $.when(model.load({url: window.IL_BASE_URL + 'index.php/chat/history?item_id=' + This.itemId})).done(function (response) {
+        $.when(model.load({url: window.IL_BASE_URL + 'index.php/chat/history?id=' + This.itemId})).done(function (response) {
             _.forEach(response.messages || [], function (m) {
                 This.addMessage(m.role, m.content, m.citations || []);
             });
@@ -5155,12 +5155,41 @@ class GlobalSettingsMainView extends View {
         super();
         this.parent = '#content-col';
         this.events = {
-            'submit #settings-form': 'submitForm'
+            'submit #settings-form': 'submitForm',
+            'click #ai-test': 'testAi'
         };
     }
     afterRender(data) {
         // Form beautification.
         formStyle.init();
+    }
+    /**
+     * Test the SAVED AI settings with a tiny request to each model. The result is written as text.
+     */
+    testAi(e) {
+        e.preventDefault();
+        let $out = $('#ai-test-result'), $btn = $('#ai-test');
+        $btn.prop('disabled', true);
+        $out.removeClass('text-success text-danger').text('Testing...');
+        $.ajax({
+            url: window.IL_BASE_URL + 'index.php/ai/test',
+            type: 'POST',
+            dataType: 'json',
+            timeout: 120000
+        }).done(function (r) {
+            let parts = [r.message];
+            if (r.ok) {
+                parts.push('Chat model: ' + (r.chat ? 'works' : 'not tested') + '.');
+                parts.push(r.embedding_dimensions ? 'Embedding model works (' + r.embedding_dimensions + ' dimensions).' : 'No embedding model set.');
+            }
+            $out.addClass(r.ok ? 'text-success' : 'text-danger').text(parts.join(' '));
+        }).fail(function (xhr) {
+            let msg = 'The test could not be run.';
+            try { msg = JSON.parse(xhr.responseText).error || msg; } catch (err) { /* keep the default */ }
+            $out.addClass('text-danger').text(msg);
+        }).always(function () {
+            $btn.prop('disabled', false);
+        });
     }
     submitForm(e) {
         e.preventDefault();
