@@ -1165,10 +1165,16 @@ EOT;
             . '<label class="mr-4 me-4" style="margin-right:1.5rem"><input type="radio" class="mr-1 me-1" name="settings[ai_enabled]" value="1"' . $on . '> ' . $t('on') . '</label>'
             . '<label><input type="radio" class="mr-1 me-1" name="settings[ai_enabled]" value="0"' . $off . '> ' . $t('off') . '</label>'
             . '<div class="text-muted small">' . $t('Each user must also turn AI features on in their own settings and acknowledge the notice. Text from PDFs is sent to the service below.') . '</div></div>'
-            . $row('ai-base-url', 'ai_base_url', 'Service address', 'The OpenAI-compatible address, e.g. https://api.openai.com/v1 or http://host:11434/v1 for Ollama.')
+            . '<div class="mt-3"><b>' . $t('Chat') . '</b></div>'
+            . $row('ai-base-url', 'ai_base_url', 'Service address', 'The OpenAI-compatible address, e.g. https://api.openai.com/v1, https://api.anthropic.com/v1/ or http://host:11434/v1 for Ollama.')
             . $row('ai-api-key', 'api_ai', 'API key', 'Can also be set as OFFPRINTLESS_API_AI in the web server configuration, which takes precedence.', 'password')
             . $row('ai-chat-model', 'ai_chat_model', 'Chat model')
+            . '<div class="mt-3"><b>' . $t('Embeddings') . '</b></div>'
+            . '<div class="text-muted small mb-1">' . $t('Used to find the right passages. Leave the address empty to use the chat service. Anthropic has no embeddings, so give another service here, for example a local Ollama.') . '</div>'
+            . $row('ai-embed-base-url', 'ai_embed_base_url', 'Service address (if different)', 'e.g. http://172.19.0.1:11434/v1')
+            . $row('ai-embed-api-key', 'api_ai_embed', 'API key (if different)', 'Used only for the address above. Also OFFPRINTLESS_API_AI_EMBED. The chat key is never sent to this service.', 'password')
             . $row('ai-embed-model', 'ai_embed_model', 'Embedding model')
+            . '<div class="mt-3"><b>' . $t('Limits') . '</b></div>'
             . $row('ai-context', 'ai_context_window', 'Context window of the chat model (tokens)')
             . $row('ai-daily', 'ai_daily_tokens', 'Tokens per user per day (0 for no limit)')
             . $row('ai-max-request', 'ai_max_request_tokens', 'Largest single request (tokens, 0 for no limit)')

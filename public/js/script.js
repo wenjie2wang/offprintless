@@ -5177,12 +5177,14 @@ class GlobalSettingsMainView extends View {
             dataType: 'json',
             timeout: 120000
         }).done(function (r) {
-            let parts = [r.message];
-            if (r.ok) {
-                parts.push('Chat model: ' + (r.chat ? 'works' : 'not tested') + '.');
-                parts.push(r.embedding_dimensions ? 'Embedding model works (' + r.embedding_dimensions + ' dimensions).' : 'No embedding model set.');
-            }
-            $out.addClass(r.ok ? 'text-success' : 'text-danger').text(parts.join(' '));
+            // One line per part, so that a problem is reported against the part that has it.
+            let line = function (name, part, extra) {
+                    return name + ': ' + (part.ok ? 'works' + (extra || '') : 'FAILED - ' + part.message);
+                },
+                chat = r.chat && typeof r.chat === 'object' ? r.chat : {ok: false, message: r.message},
+                emb = r.embeddings && typeof r.embeddings === 'object' ? r.embeddings : {ok: false, message: ''},
+                lines = [line('Chat', chat), line('Embeddings', emb, emb.embedding_dimensions ? ' (' + emb.embedding_dimensions + ' dimensions)' : '')];
+            $out.addClass(r.ok ? 'text-success' : 'text-danger').css('white-space', 'pre-line').text(lines.join('\n'));
         }).fail(function (xhr) {
             let msg = 'The test could not be run.';
             try { msg = JSON.parse(xhr.responseText).error || msg; } catch (err) { /* keep the default */ }

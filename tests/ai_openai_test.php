@@ -68,6 +68,20 @@ check('unreachable: not ok, says so', $r['ok'] === false && str_contains($r['mes
 $r = $make(['embed_model' => ''])->selfTest();
 check('no embedding model: chat is still tested and embeddings are reported as not set', $r['chat'] === true && $r['embedding_dimensions'] === null, json_encode($r));
 
+echo "--- test connection with two services ---\n";
+$chat_only = $make(['embed_model' => '']);
+$emb_only = $make(['chat_model' => '']);
+$r = $chat_only->selfTest('chat');
+check('chat part: chat tested, embeddings not touched', $r['ok'] === true && $r['chat'] === true && $r['embedding_dimensions'] === null, json_encode($r));
+$r = $emb_only->selfTest('embeddings');
+check('embeddings part: embedding tested, chat not touched', $r['ok'] === true && $r['chat'] === false && $r['embedding_dimensions'] === 3, json_encode($r));
+$r = $make(['embed_model' => 'missing'])->selfTest('chat');
+check('a broken embedding model does not fail the chat part', $r['ok'] === true && $r['chat'] === true, json_encode($r));
+$r = $make(['chat_model' => 'error-start'])->selfTest('embeddings');
+check('a broken chat model does not fail the embeddings part', $r['ok'] === true && $r['embedding_dimensions'] === 3, json_encode($r));
+$r = $make(['embed_model' => ''])->selfTest('embeddings');
+check('embeddings part with no embedding model says so', $r['ok'] === false && str_contains($r['message'], 'embedding model'), json_encode($r));
+
 proc_terminate($proc);
 echo $fails === 0 ? "\nALL PASSED\n" : "\n$fails FAILED\n";
 exit($fails === 0 ? 0 : 1);

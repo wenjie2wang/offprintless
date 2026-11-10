@@ -566,15 +566,24 @@ final class Factory {
             $settings = $this->di->getShared('AppSettings');
             $g = $settings->getGlobal();
             $client = $this->di->get('HttpClient', [['timeout' => 120, 'connect_timeout' => 10]]);
-            $provider = new \Librarian\Ai\OpenAiCompatible($client, [
-                'base_url'       => $g['ai_base_url'],
-                'api_key'        => $settings->apiKey('ai', $_SERVER, true),
-                'embed_model'    => $g['ai_embed_model'],
-                'chat_model'     => $g['ai_chat_model'],
-                'context_window' => (int) $g['ai_context_window']
-            ]);
+            $chat_key = $settings->apiKey('ai', $_SERVER, true);
 
-            return ['embed' => $provider, 'chat' => $provider];
+            $chat = new \Librarian\Ai\OpenAiCompatible($client, \Librarian\Ai\ProviderConfig::forChat($g, $chat_key));
+
+            if (\Librarian\Ai\ProviderConfig::separate($g) === false) {
+
+                // One service does both; it needs the embedding model too.
+                $both = new \Librarian\Ai\OpenAiCompatible($client, [
+                    'embed_model' => (string) $g['ai_embed_model']
+                ] + \Librarian\Ai\ProviderConfig::forChat($g, $chat_key));
+
+                return ['embed' => $both, 'chat' => $both];
+            }
+
+            $embed_key = $settings->apiKey('ai_embed', $_SERVER, true);
+            $embed = new \Librarian\Ai\OpenAiCompatible($client, \Librarian\Ai\ProviderConfig::forEmbeddings($g, $chat_key, $embed_key));
+
+            return ['embed' => $embed, 'chat' => $chat];
         });
 
         $this->di->set('HttpClient', function (array $settings = []) {

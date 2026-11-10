@@ -7,9 +7,16 @@ $counter = sys_get_temp_dir() . '/ai-stub-count-' . md5($_SERVER['HTTP_X_TEST'] 
 
 header('Content-Type: application/json');
 
-if ($auth !== 'Bearer secret-key') {
+if ($auth !== 'Bearer secret-key' && $auth !== 'Bearer chat-only-key') {
     http_response_code(401);
     echo json_encode(['error' => ['message' => 'bad key']]);
+    return;
+}
+
+// A chat-only service, like Anthropic: it has no embeddings endpoint. Selected by the key "chat-only-key".
+if ($path === '/v1/embeddings' && $auth === 'Bearer chat-only-key') {
+    http_response_code(404);
+    echo json_encode(['type' => 'error', 'error' => ['type' => 'not_found_error', 'message' => 'Not found']]);
     return;
 }
 

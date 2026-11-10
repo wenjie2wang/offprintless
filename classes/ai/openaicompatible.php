@@ -170,25 +170,39 @@ final class OpenAiCompatible implements EmbeddingProvider, ChatProvider {
     }
 
     /**
-     * Check the settings with one tiny request to each model, for the administrator's "Test connection" button.
-     * Never throws; the message is safe to show (it does not contain the key).
+     * Check the settings with one tiny request, for the administrator's "Test connection" button. Never throws; the
+     * message is safe to show (it does not contain the key).
      *
+     * @param string $part 'chat', 'embeddings', or 'both' (the default, for one service that does both).
      * @return array ['ok' => bool, 'message' => string, 'embedding_dimensions' => int|null, 'chat' => bool]
      */
-    public function selfTest(): array {
+    public function selfTest(string $part = 'both'): array {
 
         $result = ['ok' => true, 'message' => 'The AI service answered.', 'embedding_dimensions' => null, 'chat' => false];
 
         try {
 
-            if ($this->embed_model !== '') {
+            if ($part !== 'chat') {
 
-                $v = $this->embed(['test'], 'query');
-                $result['embedding_dimensions'] = count($v[0]);
+                if ($this->embed_model === '') {
+
+                    if ($part === 'embeddings') {
+
+                        throw new Exception('no embedding model is set', 422);
+                    }
+
+                } else {
+
+                    $v = $this->embed(['test'], 'query');
+                    $result['embedding_dimensions'] = count($v[0]);
+                }
             }
 
-            $this->stream([['role' => 'user', 'content' => 'Reply with the single word: ok']], function () {}, ['max_tokens' => 5]);
-            $result['chat'] = true;
+            if ($part !== 'embeddings') {
+
+                $this->stream([['role' => 'user', 'content' => 'Reply with the single word: ok']], function () {}, ['max_tokens' => 5]);
+                $result['chat'] = true;
+            }
 
         } catch (Exception $e) {
 

@@ -315,6 +315,10 @@ Both fit at once. Phase 0 compares these with a cloud embedding model on real pa
 
 I would make the app image and the worker the same image, so there is one build to keep current.
 
+### 10.8 Chat and embeddings on different services (built)
+
+Anthropic's OpenAI-compatible endpoint has no `/v1/embeddings` (it answers 404), so Claude can answer but cannot embed. The settings therefore have a separate, optional embedding address and key (`ai_embed_base_url`, `api_ai_embed` or `OFFPRINTLESS_API_AI_EMBED`). With the address empty, one service does both, as before. With it set, embeddings go there with their own key; **the chat key is never sent to the embedding service**. Test connection checks chat and embeddings separately and reports one line for each, so a chat-only service shows "Chat: works" and "Embeddings: FAILED" instead of one opaque error. `Librarian\Ai\ProviderConfig` holds the rule.
+
 ## 11. Decision 4: PDF text and outside services (settled)
 
 Decided: embeddings come from an API, and text may leave `tars` once a user has allowed it through the per-user switch.
