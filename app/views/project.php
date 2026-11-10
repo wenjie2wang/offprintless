@@ -217,6 +217,22 @@ HTML
             ]
         ];
 
+        // Notebook: offered only to someone for whom AI features are allowed.
+        try {
+
+            \Librarian\Ai\AiGate::check($this->app_settings->getGlobal(), $this->app_settings->getUser(), true);
+
+            array_splice($menu_arr, 4, 0, [[
+                'label' => "{$discuss_icon}{$this->lang->t9n('Notebook')}",
+                'link'  => '#notebook?id=',
+                'attrs' => 'class="add-id-link"'
+            ]]);
+
+        } catch (Exception $exc) {
+
+            // Switched off, not acknowledged or not set up: no menu entry.
+        }
+
         /** @var Bootstrap\SideMenu $el */
         $el = $this->di->get('SideMenu');
 

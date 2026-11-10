@@ -81,6 +81,9 @@ class ChatController extends AppController {
         $model = new ChatModel($this->di);
         $view = new DefaultView($this->di);
 
+        // The client asks for JSON so that errors before the first event arrive as JSON; the answer itself is a stream.
+        $view->contentType('event-stream');
+
         set_time_limit(300);
 
         $started = false;

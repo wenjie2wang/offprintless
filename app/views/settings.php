@@ -1172,6 +1172,7 @@ EOT;
             . $row('ai-context', 'ai_context_window', 'Context window of the chat model (tokens)')
             . $row('ai-daily', 'ai_daily_tokens', 'Tokens per user per day (0 for no limit)')
             . $row('ai-max-request', 'ai_max_request_tokens', 'Largest single request (tokens, 0 for no limit)')
+            . $row('ai-max-papers', 'ai_max_notebook_papers', 'Most papers in one notebook request')
             . '<button type="button" class="btn btn-secondary btn-sm" id="ai-test">' . $t('Test connection') . '</button>'
             . '<div class="small mt-2" id="ai-test-result"></div>'
             . '<div class="text-muted small">' . $t('Save the settings first; the test uses the saved values.') . '</div></div>';

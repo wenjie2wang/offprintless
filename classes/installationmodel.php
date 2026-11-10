@@ -201,6 +201,19 @@ class InstallationModel extends Model {
             $db->getPDO()->exec(file_get_contents($file));
         }
 
+        // An ai.db made before the notebook has chat_messages without these two columns.
+        $db->run('PRAGMA table_info(chat_messages)');
+        $have = array_column($db->getResultRows(), 'name');
+        $db->getPDOStatement()->closeCursor();
+
+        foreach (['kind' => "TEXT NOT NULL DEFAULT 'ask'", 'sources' => "TEXT NOT NULL DEFAULT '[]'"] as $column => $definition) {
+
+            if ($have !== [] && in_array($column, $have, true) === false) {
+
+                $db->getPDO()->exec("ALTER TABLE chat_messages ADD COLUMN $column $definition");
+            }
+        }
+
         $db->close();
     }
 

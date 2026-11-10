@@ -624,6 +624,20 @@ EOT;
         ];
 
         $this->db_main->run($sql, $columns);
+
+        // The notebook history of the project lives in ai.db, outside this database; it can be rebuilt, so a failure
+        // here must not undo the deletion.
+        try {
+
+            $db = $this->di->get('Db_ai');
+            $db->connect();
+            (new \Librarian\Ai\VectorStore($db))->deleteProject($project_id);
+            $db->close();
+
+        } catch (\Throwable $exc) {
+
+            // Leftovers are unreachable: nobody has a role over a project that does not exist.
+        }
     }
 
     /**

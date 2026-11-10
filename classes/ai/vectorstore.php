@@ -113,6 +113,26 @@ final class VectorStore {
     public function deleteItem(int $item_id): void {
 
         $this->db->run('DELETE FROM vectors WHERE item_id = ?', [$item_id]);
-        $this->db->run("DELETE FROM chats WHERE scope = 'item' AND scope_id = ?", [$item_id]);
+        $this->deleteChats('item', $item_id);
+    }
+
+    /**
+     * Remove the notebook history of a project that no longer exists (messages go with their chats).
+     */
+    public function deleteProject(int $project_id): void {
+
+        $this->deleteChats('project', $project_id);
+    }
+
+    /**
+     * Messages first, then their chats, without relying on a cascade that an older ai.db may not have.
+     */
+    private function deleteChats(string $scope, int $scope_id): void {
+
+        $this->db->run(
+            'DELETE FROM chat_messages WHERE chat_id IN (SELECT id FROM chats WHERE scope = ? AND scope_id = ?)',
+            [$scope, $scope_id]
+        );
+        $this->db->run('DELETE FROM chats WHERE scope = ? AND scope_id = ?', [$scope, $scope_id]);
     }
 }

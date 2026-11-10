@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS chat_messages(
     role      TEXT    NOT NULL,
     content   TEXT    NOT NULL,
     citations TEXT    NOT NULL DEFAULT '[]',
+    kind      TEXT    NOT NULL DEFAULT 'ask',
+    sources   TEXT    NOT NULL DEFAULT '[]',
     tokens    INTEGER NOT NULL DEFAULT 0,
     created   TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

@@ -2884,6 +2884,44 @@ class ItemdiscussionMainView extends View {
 
 views.itemdiscussionmain = new ItemdiscussionMainView();
 
+/**
+ * POST a form and read a server-sent event stream from the answer. Each event is a JSON object on a "data: " line.
+ * Resolves when the stream ends; rejects with an Error (message from the server when it sent one) before it starts.
+ */
+function streamPost(url, params, onEvent) {
+    params.csrfToken = window.csrfToken;
+    return fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'},
+        body: new URLSearchParams(params).toString()
+    }).then(function (response) {
+        if (!response.ok) {
+            return response.json().catch(function () { return {}; }).then(function (j) {
+                throw new Error(j.error || ('Error ' + response.status));
+            });
+        }
+        let reader = response.body.getReader(), decoder = new TextDecoder(), buffer = '';
+        let pump = function () {
+            return reader.read().then(function (r) {
+                if (r.done) {
+                    return;
+                }
+                buffer += decoder.decode(r.value, {stream: true});
+                let parts = buffer.split('\n\n');
+                buffer = parts.pop();
+                _.forEach(parts, function (part) {
+                    if (part.indexOf('data: ') === 0) {
+                        try { onEvent(JSON.parse(part.substr(6))); } catch (err) { /* ignore a broken line */ }
+                    }
+                });
+                return pump();
+            });
+        };
+        return pump();
+    });
+}
+
 class ChatMainView extends View {
     constructor() {
         super();
@@ -2959,47 +2997,16 @@ class ChatMainView extends View {
             This.busy = false;
             $('#chat-send').prop('disabled', false);
         };
-        let body = new URLSearchParams({item_id: This.itemId, question: question, csrfToken: window.csrfToken});
-        fetch(window.IL_BASE_URL + 'index.php/chat/send', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'text/event-stream'},
-            body: body.toString()
-        }).then(function (response) {
-            if (!response.ok) {
-                return response.json().catch(function () { return {}; }).then(function (j) {
-                    throw new Error(j.error || ('Error ' + response.status));
-                });
+        streamPost(window.IL_BASE_URL + 'index.php/chat/send', {item_id: This.itemId, question: question}, function (event) {
+            if (event.t !== undefined) {
+                got += event.t;
+                $text.text(got);
+            } else if (event.error !== undefined) {
+                $('#chat-error').text(event.error);
+            } else if (event.done !== undefined) {
+                This.addCitations($answer, event.done.citations || []);
+                This.meter((event.done.meter || {}).used || 0);
             }
-            let reader = response.body.getReader(), decoder = new TextDecoder(), buffer = '';
-            let handle = function (event) {
-                if (event.t !== undefined) {
-                    got += event.t;
-                    $text.text(got);
-                } else if (event.error !== undefined) {
-                    $('#chat-error').text(event.error);
-                } else if (event.done !== undefined) {
-                    This.addCitations($answer, event.done.citations || []);
-                    This.meter((event.done.meter || {}).used || 0);
-                }
-            };
-            let pump = function () {
-                return reader.read().then(function (r) {
-                    if (r.done) {
-                        return;
-                    }
-                    buffer += decoder.decode(r.value, {stream: true});
-                    let parts = buffer.split('\n\n');
-                    buffer = parts.pop();
-                    _.forEach(parts, function (part) {
-                        if (part.indexOf('data: ') === 0) {
-                            try { handle(JSON.parse(part.substr(6))); } catch (err) { /* ignore a broken line */ }
-                        }
-                    });
-                    return pump();
-                });
-            };
-            return pump();
         }).catch(function (err) {
             $('#chat-error').text(err.message);
             if (got === '') {
@@ -3010,6 +3017,166 @@ class ChatMainView extends View {
 }
 
 views.chatmain = new ChatMainView();
+
+class NotebookMainView extends View {
+    constructor() {
+        super();
+        this.parent = '#content-col';
+        this.events = {
+            'submit #nb-form': 'ask',
+            'keydown #nb-question': 'keys',
+            'click .nb-output': 'output',
+            'click #nb-all': 'tickAll',
+            'click #nb-none': 'tickNone',
+            'click .nb-copy': 'copy',
+            'click .nb-del': 'remove'
+        };
+    }
+    afterRender(data) {
+        let This = this;
+        This.projectId = $('#nb-root').data('project-id');
+        This.windowSize = parseInt($('#nb-root').data('window')) || 0;
+        // model.load() aborts a request still in flight, so the two reads go one after the other.
+        $.when(model.load({url: window.IL_BASE_URL + 'index.php/notebook/sources?id=' + This.projectId})).done(function (response) {
+            _.forEach(response.sources || [], function (s) {
+                let $row = $('<label class="d-flex align-items-start mb-1"></label>'),
+                    $box = $('<input type="checkbox" class="nb-src mr-2 me-2 mt-1">').val(s.item_id).prop('checked', s.has_text === 1 || s.has_text === '1');
+                $row.append($box).append($('<span class="small"></span>').text(s.title + (s.year ? ' (' + s.year + ')' : '') + (s.has_text ? '' : ' - no text')));
+                $('#nb-sources').append($row);
+            });
+            $.when(model.load({url: window.IL_BASE_URL + 'index.php/notebook/history?id=' + This.projectId})).done(function (response) {
+                _.forEach(response.messages || [], function (m) {
+                    This.addMessage(m.role, m.content, m.citations || [], m.id, m.kind);
+                });
+            });
+        });
+    }
+    keys(e) {
+        if (e.which === 13 && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            $('#nb-form').trigger('submit');
+        }
+    }
+    tickAll(e) {
+        e.preventDefault();
+        $('.nb-src').prop('checked', true);
+    }
+    tickNone(e) {
+        e.preventDefault();
+        $('.nb-src').prop('checked', false);
+    }
+    ticked() {
+        return $('.nb-src:checked').map(function () { return $(this).val(); }).get();
+    }
+    /**
+     * Add a message to the log. Always as text: nothing a model or a PDF says becomes markup.
+     */
+    addMessage(role, text, citations, messageId, kind) {
+        $('#nb-empty').remove();
+        let $m = $('<div class="nb-msg mb-3"></div>').addClass('nb-' + role).attr('data-id', messageId || '');
+        $m.append($('<div class="small text-muted"></div>').text(role === 'user' ? 'You' : 'AI'));
+        $m.append($('<div class="nb-text" style="white-space:pre-wrap"></div>').text(text));
+        $('#nb-log').append($m);
+        if (role === 'assistant') {
+            this.finishMessage($m, citations || [], messageId);
+        }
+        return $m;
+    }
+    finishMessage($m, citations, messageId) {
+        $m.find('.nb-extras').remove();
+        let $x = $('<div class="nb-extras small mt-1"></div>');
+        _.forEach(citations, function (c) {
+            let label = '[' + parseInt(c.n) + '] ' + c.title + (parseInt(c.page) ? ', p. ' + parseInt(c.page) : '');
+            let $a = $('<a class="mr-3 me-3"></a>').attr('href', '#pdf/main?id=' + parseInt(c.item_id) + (parseInt(c.page) ? '&page=' + parseInt(c.page) : '')).text(label).attr('title', c.text);
+            $x.append($a);
+        });
+        if (messageId) {
+            $m.attr('data-id', messageId);
+            $x.append($('<a href="#" class="nb-copy mr-3 me-3"></a>').text('Copy to project notes'));
+            $x.append($('<a href="#" class="nb-del text-muted"></a>').text('Delete'));
+        }
+        $m.append($x);
+    }
+    meter(used) {
+        let w = this.windowSize;
+        $('#nb-meter').text(used + ' / ' + w);
+        $('#nb-meter-bar').css('width', (w > 0 ? Math.min(100, Math.round(100 * used / w)) : 0) + '%');
+    }
+    ask(e) {
+        e.preventDefault();
+        let This = e.data.object, q = $.trim($('#nb-question').val());
+        if (q === '') {
+            return;
+        }
+        $('#nb-question').val('');
+        This.run('ask', q);
+    }
+    output(e) {
+        e.preventDefault();
+        let This = e.data.object, mode = $(this).data('mode');
+        This.run(mode, '');
+    }
+    run(mode, question) {
+        let This = this;
+        if (This.busy) {
+            return;
+        }
+        let items = This.ticked();
+        if (items.length === 0) {
+            $('#nb-error').text('Tick at least one paper.');
+            return;
+        }
+        This.busy = true;
+        $('#nb-error').text('');
+        $('#nb-status').text('');
+        $('.nb-output, #nb-send').prop('disabled', true);
+        let labels = {briefing: 'Briefing', compare: 'Compare papers', faq: 'FAQ and glossary'};
+        This.addMessage('user', mode === 'ask' ? question : labels[mode], [], null, mode);
+        let $answer = This.addMessage('assistant', '', [], null, mode), $text = $answer.find('.nb-text'), got = '';
+        let params = {project_id: This.projectId, mode: mode, question: question};
+        _.forEach(items, function (id, i) { params['item_ids[' + i + ']'] = id; });
+        streamPost(window.IL_BASE_URL + 'index.php/notebook/send', params, function (event) {
+            if (event.t !== undefined) {
+                got += event.t;
+                $text.text(got);
+                $('#nb-status').text('');
+            } else if (event.status !== undefined) {
+                $('#nb-status').text(event.status.step === 'summarising' ?
+                    'Summarising paper ' + (event.status.done + 1) + ' of ' + event.status.of + '...' : 'Writing...');
+            } else if (event.error !== undefined) {
+                $('#nb-error').text(event.error);
+            } else if (event.done !== undefined) {
+                This.finishMessage($answer, event.done.citations || [], event.done.message_id);
+                This.meter((event.done.meter || {}).used || 0);
+            }
+        }).catch(function (err) {
+            $('#nb-error').text(err.message);
+            if (got === '') {
+                $answer.remove();
+            }
+        }).then(function () {
+            This.busy = false;
+            $('#nb-status').text('');
+            $('.nb-output, #nb-send').prop('disabled', false);
+        });
+    }
+    copy(e) {
+        e.preventDefault();
+        let This = e.data.object, $link = $(this), id = $link.closest('.nb-msg').attr('data-id');
+        $.when(model.save({url: window.IL_BASE_URL + 'index.php/notebook/tonotes', data: {project_id: This.projectId, message_id: id}})).done(function () {
+            $link.text('Copied');
+        });
+    }
+    remove(e) {
+        e.preventDefault();
+        let This = e.data.object, $msg = $(this).closest('.nb-msg'), id = $msg.attr('data-id');
+        $.when(model.save({url: window.IL_BASE_URL + 'index.php/notebook/delete', data: {project_id: This.projectId, message_id: id}})).done(function () {
+            $msg.remove();
+        });
+    }
+}
+
+views.notebookmain = new NotebookMainView();
 
 /**
  * Item tags.

@@ -19,6 +19,16 @@ final class FakeProvider implements EmbeddingProvider, ChatProvider {
      */
     public array $last_messages = [];
 
+    /**
+     * @var array Messages of every stream() call, in order.
+     */
+    public array $calls = [];
+
+    /**
+     * @var int Context window reported to the meter; tests lower it to force map-reduce.
+     */
+    public int $window = 8000;
+
     public function id(): string {
 
         return 'fake:1';
@@ -31,7 +41,7 @@ final class FakeProvider implements EmbeddingProvider, ChatProvider {
 
     public function contextWindow(): int {
 
-        return 8000;
+        return $this->window;
     }
 
     public function embed(array $texts, string $kind): array {
@@ -57,6 +67,7 @@ final class FakeProvider implements EmbeddingProvider, ChatProvider {
     public function stream(array $messages, callable $on_token, array $options = []): array {
 
         $this->last_messages = $messages;
+        $this->calls[] = $messages;
         $prompt = 0;
 
         foreach ($messages as $m) {

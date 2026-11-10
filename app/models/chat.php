@@ -5,6 +5,7 @@ namespace LibrarianApp;
 use Exception;
 use Librarian\Ai\AiGate;
 use Librarian\Ai\Chunker;
+use Librarian\Ai\PassageIndex;
 use Librarian\Ai\PromptBuilder;
 use Librarian\Ai\UsageMeter;
 use Librarian\Ai\VectorStore;
@@ -28,11 +29,6 @@ class ChatModel extends AppModel {
      * Passages retrieved for one question.
      */
     private const TOP_K = 6;
-
-    /**
-     * Most passages made for one paper; the rest of a very long text is left out.
-     */
-    private const MAX_CHUNKS = 800;
 
     /**
      * Earlier messages sent along with a question.
@@ -141,37 +137,18 @@ class ChatModel extends AppModel {
         $meter = new UsageMeter($this->db_ai);
 
         // Estimate before anything leaves the server, so a refusal costs nothing.
-        $chunks = [];
-        $needs_build = $store->has($item_id, 'chunk', $model_id) === false;
-        $estimate = PromptBuilder::tokens($question) + (int) ceil((self::TOP_K * Chunker::TARGET + 800) / 4);
+        $plan = PassageIndex::plan($store, $item_id, $text, $model_id);
 
-        if ($needs_build) {
+        if ($plan['chunks'] === [] && $store->has($item_id, 'chunk', $model_id) === false) {
 
-            $chunks = array_slice(Chunker::chunk($text), 0, self::MAX_CHUNKS);
-
-            if ($chunks === []) {
-
-                throw new Exception('this paper has no text to ask about; it may be a scan', 422);
-            }
-
-            $estimate += (int) ceil(array_sum(array_map(fn($c) => strlen($c['text']), $chunks)) / 4);
+            throw new Exception('this paper has no text to ask about; it may be a scan', 422);
         }
+
+        $estimate = PromptBuilder::tokens($question) + (int) ceil((self::TOP_K * Chunker::TARGET + 800) / 4) + $plan['tokens'];
 
         $meter->assertWithin((int) $this->user_id, (int) $global['ai_daily_tokens'], $estimate, (int) $global['ai_max_request_tokens']);
 
-        if ($needs_build) {
-
-            $vectors = $embed->embed(array_column($chunks, 'text'), 'document');
-            $rows = [];
-
-            foreach ($chunks as $i => $c) {
-
-                $rows[] = $c + ['text_hash' => md5($c['text']), 'vec' => $vectors[$i]];
-            }
-
-            $store->replace($item_id, 'chunk', $model_id, $rows);
-            $meter->add((int) $this->user_id, (int) ceil(array_sum(array_map(fn($c) => strlen($c['text']), $chunks)) / 4));
-        }
+        $meter->add((int) $this->user_id, PassageIndex::build($store, $embed, $item_id, $model_id, $plan['chunks']));
 
         $query = $embed->embed([$question], 'query')[0];
         $hits = $store->search($item_id, 'chunk', $model_id, $query, self::TOP_K);

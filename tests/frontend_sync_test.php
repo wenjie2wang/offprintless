@@ -29,5 +29,19 @@ foreach (['SCOPUS', 'DIRECT', 'PAT', 'IEEE', 'ARXIV', 'NASAADS', 'PMCID'] as $ty
 check('the highlighter does not switch the page into edit mode', [str_contains($src, 'designMode'), str_contains($min, 'designMode')], [false, false]);
 check('...and uses text nodes', [str_contains($src, 'createTreeWalker'), str_contains($min, 'createTreeWalker')], [true, true]);
 
+// AI pages: both views use the one stream reader, and nothing a model says is written as HTML.
+check('streamPost exists in both', [str_contains($src, 'function streamPost('), str_contains($min, 'function streamPost(')], [true, true]);
+check('chat and notebook both stream through streamPost (source)', substr_count($src, 'streamPost(window.IL_BASE_URL'), 2);
+check('chat and notebook both stream through streamPost (minified)', substr_count($min, 'streamPost(window.IL_BASE_URL'), 2);
+check('no second copy of the stream reader (source)', substr_count($src, 'getReader()'), 1);
+check('no second copy of the stream reader (minified)', substr_count($min, 'getReader()'), 1);
+foreach (['ChatMainView', 'NotebookMainView'] as $cls) {
+    check("$cls is in both", [str_contains($src, "class $cls extends View"), str_contains($min, "class $cls extends View")], [true, true]);
+}
+// Message text goes in with .text(); no .html( call may take a model answer, a question or a title.
+preg_match('/class NotebookMainView.*?views\.notebookmain/s', $src, $nb); preg_match('/class ChatMainView.*?views\.chatmain/s', $src, $ch);
+check('the notebook view never calls .html(', preg_match('/\.html\(/', $nb[0] ?? ''), 0);
+check('the chat view never calls .html(', preg_match('/\.html\(/', $ch[0] ?? ''), 0);
+
 echo $fails === 0 ? "\nALL PASSED\n" : "\n$fails FAILED\n";
 exit($fails === 0 ? 0 : 1);
