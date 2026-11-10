@@ -4,6 +4,7 @@ namespace LibrarianApp;
 
 use DateTimeZone;
 use Exception;
+use Librarian\Security\AiConsent;
 
 /**
  * Class SettingsController
@@ -105,9 +106,12 @@ class SettingsController extends AppController {
                 $this->post['settings']['timezone'];
         }
 
-        // Get locally saved user settings and merge new settings.
+        // Get locally saved user settings and merge new settings. AI features turn on only with an acknowledgement.
         $user_settings = $this->app_settings->getUser();
-        $new_settings = $this->post['settings'] + $user_settings;
+        $ai = AiConsent::apply($user_settings, $this->post['settings']);
+        $new_settings = array_intersect_key($ai, array_flip(['ai_enabled', 'ai_ack_version', 'ai_ack_at']))
+            + array_diff_key($this->post['settings'], array_flip(['ai_enabled', 'ai_ack_version', 'ai_ack_at']))
+            + $user_settings;
 
         // Save new settings permanently.
         $model = new SettingsModel($this->di);

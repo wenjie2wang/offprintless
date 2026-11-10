@@ -105,7 +105,8 @@ Vectors are keyed by `model_id`. Changing the model re-embeds in the background 
 
 ## 4. Privacy and security rules (apply to every phase)
 
-1. **Off by default.** An administrator turns the feature on. Two separate switches: "use AI features" and "allow text to leave this server". With only the first on, only a provider on the local network is allowed.
+1. **Off by default, at two levels.** An administrator turns the feature on for the server: two separate switches: "use AI features" and "allow text to leave this server". With only the first on, only a provider on the local network is allowed.
+   Each user also has their own switch, **off by default** (`ai_enabled`). Turning it on, every time it goes from off to on, shows a notice about the legal risk of sending text from licensed journal PDFs to an outside service and needs an explicit acknowledgement. The server records the notice version and the time (`ai_ack_version`, `ai_ack_at`) and refuses to turn it on without the current version; changing the notice text bumps `AiConsent::VERSION`, which voids earlier acknowledgements. Every AI feature must ask `Librarian\Security\AiConsent::allowed($user_settings)`, in addition to the administrator's switches and the project mark. All of them must allow. Built and tested in `tests/ai_consent_test.php`.
 2. **Access first.** Every vector query, retrieval and chat is filtered by the same visibility query as the library. A user without access never gets an item id, a passage, a count or a score. A test modelled on the existing privacy tests proves it, including the moment a member is removed.
 3. **Licensed content.** The library may hold paywalled journal PDFs shared with invited users. Sending their full text to a third-party service may be restricted by the publisher's terms. A project can be marked "never send to external AI"; those items are embedded locally or not at all. (This is a flag for the owner to check, not legal advice.)
 4. **Retrieved text is data, not instructions.** PDF text can contain prompt injection. Model output never triggers a write by itself: plug-ins and chat propose, a person applies.
@@ -329,6 +330,8 @@ What the design does about it, whichever you choose.
 3. **A project can be marked "never send to outside AI".** Papers in it are embedded locally or not at all, even if the global switch is on. The shared journal projects would carry this mark.
 4. **The mark follows the paper.** A paper that is in a marked project and in another project is treated as marked everywhere, so a copy in a second project cannot be used to get around it.
 5. **No quiet fallback.** If the local model is down, a marked paper waits; it is never sent to the cloud instead.
+
+The per-user switch (section 4, rule 1) adds a second line of defence: nobody's text is used, even locally, until that person has turned the features on and acknowledged the notice. It does not replace the project mark: the mark protects a paper from the choices of any one user, the acknowledgement records that each user was told.
 
 The practical question for you: choose one.
 

@@ -1719,7 +1719,11 @@ class SettingsMainView extends View {
         super();
         this.parent = '#content-col';
         this.events = {
-            'submit #user-settings-form': 'saveForm'
+            'submit #user-settings-form': 'saveForm',
+            'change #ai_enabled': 'aiToggle',
+            'change #ai-notice-ack': 'aiAck',
+            'click #ai-notice-accept': 'aiAccept',
+            'click #ai-notice-cancel': 'aiCancel'
         };
     }
     afterRender(data) {
@@ -1729,12 +1733,39 @@ class SettingsMainView extends View {
         // Delete settings modal body to prevent conflicts.
         $('#modal-settings').find('.modal-body').html('');
     }
+    aiToggle(e) {
+        // Turning on (from off) shows the notice first; the box stays unchecked until it is accepted.
+        if ($('#ai_enabled').prop('checked')) {
+            $('#ai_enabled').prop('checked', false);
+            $('#ai-notice-ack').prop('checked', false);
+            $('#ai-notice-accept').prop('disabled', true);
+            $('#modal-ai-notice').modal({backdrop: 'static', keyboard: false});
+            $('#modal-ai-notice').modal('show');
+        } else {
+            $('#ai_ack_version').val('');
+        }
+    }
+    aiAck(e) {
+        $('#ai-notice-accept').prop('disabled', !$('#ai-notice-ack').prop('checked'));
+    }
+    aiAccept(e) {
+        if ($('#ai-notice-ack').prop('checked') === false) {
+            return;
+        }
+        $('#ai_ack_version').val($('#ai-section').data('version'));
+        $('#ai_enabled').prop('checked', true);
+        $('#modal-ai-notice').modal('hide');
+    }
+    aiCancel(e) {
+        $('#ai_enabled').prop('checked', false);
+        $('#modal-ai-notice').modal('hide');
+    }
     saveForm(e) {
         e.preventDefault();
         let $f = $(this);
         // Add unchecked boxes as hidden inputs.
         $f.find(':checkbox').each(function () {
-            if ($(this).prop('checked') === false) {
+            if ($(this).prop('checked') === false && $(this).attr('name')) {
                 $f.append(`<input type="hidden" name="${$(this).attr('name')}" value="0">`);
             }
         });

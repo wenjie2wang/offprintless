@@ -22,6 +22,9 @@ final class AppSettings {
      * Default user settings.
      */
     public array $default_user_settings = [
+        'ai_ack_at'        => '',
+        'ai_ack_version'   => '',
+        'ai_enabled'       => '0',
         'connect_arxiv'    => '1',
         'connect_crossref' => '1',
         'connect_xplore'   => '1',

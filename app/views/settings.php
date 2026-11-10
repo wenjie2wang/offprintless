@@ -5,6 +5,7 @@ namespace LibrarianApp;
 use Exception;
 use Librarian\Html\Bootstrap;
 use Librarian\Mvc\TextView;
+use Librarian\Security\AiConsent;
 
 class SettingsView extends TextView {
 
@@ -1043,7 +1044,7 @@ class SettingsView extends TextView {
         $el = $this->di->get('Card');
 
         $el->addClass('mb-5');
-        $el->body($radios);
+        $el->body($radios . $this->aiSection($user_settings));
         $el->footer($submit);
         $card = $el->render();
 
@@ -1070,6 +1071,76 @@ class SettingsView extends TextView {
         $this->append(['html' => "$bc $row"]);
 
         return $this->send();
+    }
+
+    /**
+     * The AI features switch with its notice. The switch is off until the person acknowledges the notice; the page
+     * only asks, the server (AiConsent) decides.
+     *
+     * @param array $user_settings
+     * @return string
+     */
+    private function aiSection(array $user_settings): string {
+
+        $on = AiConsent::allowed($user_settings);
+        $checked = $on ? ' checked' : '';
+        $version = AiConsent::VERSION;
+        $title = $this->lang->t9n('AI features');
+        $label = $this->lang->t9n('Turn on AI features for my account');
+        $note = $this->lang->t9n('Off by default. Turning them on asks you to acknowledge a notice about the text of your PDFs.');
+        $since = $on && !empty($user_settings['ai_ack_at'])
+            ? '<div class="text-muted small">' . $this->lang->t9n('Acknowledged') . ' ' . htmlspecialchars((string) $user_settings['ai_ack_at']) . '</div>'
+            : '';
+
+        $notice = [
+            'Some features send text taken from your PDFs, such as the title, the abstract and passages, to an AI service.',
+            'If the service is run by another company (a cloud provider), that text leaves this server and is processed under that company\'s terms.',
+            'Journal articles are usually protected by copyright and by the license or subscription through which you obtained them. Many publishers restrict copying the text to third parties, and some forbid it for AI use. Whether sending it is allowed is your responsibility, not this application\'s.',
+            'You and your institution may be bound by agreements with publishers, funders or employers that apply. Do not turn this on for material you are not allowed to share with an outside service.',
+            'A service on your own computer or network (a local model) does not send text to a third party. Ask your administrator which kind this server uses.',
+            'Your administrator can switch AI features off for everyone, and a project can be marked so that its papers are never sent. You can turn this off again at any time.'
+        ];
+        $items = '';
+
+        foreach ($notice as $line) {
+
+            $items .= '<li class="mb-2">' . htmlspecialchars($this->lang->t9n($line)) . '</li>';
+        }
+
+        $cancel = $this->lang->t9n('Cancel');
+        $accept = $this->lang->t9n('Turn on');
+        $ack = $this->lang->t9n('I have read this notice and accept the risk.');
+        $heading = $this->lang->t9n('Before you turn on AI features');
+
+        return <<<EOT
+<div class="mt-4" id="ai-section" data-version="{$version}">
+    <div><b>{$title}</b></div>
+    <label class="d-flex align-items-center mt-2 mb-1" for="ai_enabled">
+        <input type="checkbox" class="mr-2 me-2" id="ai_enabled" name="settings[ai_enabled]" value="1"{$checked}>
+        <span>{$label}</span>
+    </label>
+    <input type="hidden" id="ai_ack_version" name="settings[ai_ack_version]" value="">
+    <div class="text-muted small">{$note}</div>
+    {$since}
+</div>
+<div class="modal fade" id="modal-ai-notice" tabindex="-1" role="dialog" aria-labelledby="ai-notice-title" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title" id="ai-notice-title">{$heading}</h5></div>
+            <div class="modal-body"><ul class="ps-3">{$items}</ul>
+                <label class="d-flex align-items-center mt-3" for="ai-notice-ack">
+                    <input type="checkbox" class="mr-2 me-2" id="ai-notice-ack">
+                    <b>{$ack}</b>
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="ai-notice-cancel">{$cancel}</button>
+                <button type="button" class="btn btn-danger" id="ai-notice-accept" disabled>{$accept}</button>
+            </div>
+        </div>
+    </div>
+</div>
+EOT;
     }
 
     /**
