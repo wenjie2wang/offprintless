@@ -1097,8 +1097,8 @@ class SettingsView extends TextView {
             'If that service is run by another company (a cloud provider), the text leaves this server and is processed under that company\'s terms. Once it has been sent it cannot be taken back.',
             'Journal articles are usually protected by copyright and by the license or subscription through which you obtained them. Many publishers restrict copying the text to third parties, and some forbid it for AI use. Whether sending it is allowed is your responsibility, not this application\'s.',
             'You and your institution may be bound by agreements with publishers, funders or employers that apply. Do not turn this on for material you are not allowed to share with an outside service.',
-            'A service on your own computer or network (a local model) does not send text to a third party. Ask your administrator which kind this server uses.',
-            'Your administrator can switch AI features off for everyone, and a project can be marked so that its papers are never sent. You can turn this off again at any time.'
+            'A service on your own computer or network (a local model) does not send text to a third party. Ask your administrator which kind this server uses; if it is a cloud service, accepting this notice allows the text to leave this server.',
+            'Your administrator can switch AI features off for everyone. You can turn this off again at any time; text already sent cannot be taken back.'
         ];
         $items = '';
 

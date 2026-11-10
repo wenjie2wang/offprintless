@@ -12,15 +12,14 @@ use Exception;
  * time. Changing the wording of the notice means changing VERSION, which makes every earlier acknowledgement void.
  * Features must ask allowed(), never read ai_enabled alone.
  *
- * This is one of three gates. The administrator's switches and the project's "never send to outside AI" mark are
- * checked separately; all of them must allow.
+ * This is the user's gate. The administrator's master switch is checked separately; both must allow.
  */
 final class AiConsent {
 
     /**
      * Version of the notice text in the settings page. Change it with the text.
      */
-    public const VERSION = '2';
+    public const VERSION = '3';
 
     /**
      * May AI features run for a user with these settings?

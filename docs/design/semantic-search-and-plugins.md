@@ -105,10 +105,10 @@ Vectors are keyed by `model_id`. Changing the model re-embeds in the background 
 
 ## 4. Privacy and security rules (apply to every phase)
 
-1. **Off by default, at two levels.** An administrator turns the feature on for the server: two separate switches: "use AI features" and "allow text to leave this server". With only the first on, only a provider on the local network is allowed.
+1. **Off by default, and the user's own switch is the gate.** An administrator configures the API and may switch AI features off for the whole server ("use AI features"). Each user has their own switch (`ai_enabled`), **off by default**. Turning it on, every time it goes from off to on, shows a notice that states plainly that accepting it **allows the user's PDF text to be sent to the configured outside AI service**, and explains the legal risk of doing so with licensed journal PDFs. It needs an explicit acknowledgement. The server records the notice version and the time (`ai_ack_version`, `ai_ack_at`) and refuses to turn it on without the current version; changing the notice text bumps `AiConsent::VERSION`, which voids earlier acknowledgements. Every AI feature must ask `Librarian\Security\AiConsent::allowed($user_settings)`, in addition to the administrator's master switch. There is no separate "allow text to leave this server" switch and no per-project exclusion: the user's acknowledgement is the permission. Built and tested in `tests/ai_consent_test.php`.
    Each user also has their own switch, **off by default** (`ai_enabled`). Turning it on, every time it goes from off to on, shows a notice that states plainly that accepting it **allows the user's PDF text to be sent to the configured outside AI service**, and explains the legal risk of doing so with licensed journal PDFs. It needs an explicit acknowledgement. The server records the notice version and the time (`ai_ack_version`, `ai_ack_at`) and refuses to turn it on without the current version; changing the notice text bumps `AiConsent::VERSION`, which voids earlier acknowledgements. Every AI feature must ask `Librarian\Security\AiConsent::allowed($user_settings)`, in addition to the administrator's switches and the project mark. All of them must allow. Built and tested in `tests/ai_consent_test.php`.
 2. **Access first.** Every vector query, retrieval and chat is filtered by the same visibility query as the library. A user without access never gets an item id, a passage, a count or a score. A test modelled on the existing privacy tests proves it, including the moment a member is removed.
-3. **Licensed content.** The library may hold paywalled journal PDFs shared with invited users. Sending their full text to a third-party service may be restricted by the publisher's terms. A project can be marked "never send to external AI"; those items are embedded locally or not at all. (This is a flag for the owner to check, not legal advice.)
+3. **Licensed content.** The library may hold paywalled journal PDFs shared with invited users. Sending their text to a third-party service may be restricted by the publisher's terms. The notice in rule 1 tells each user this before they allow it; whether it is permitted is their responsibility, not the application's. (Not legal advice.) **Whose consent counts:** a paper is sent to the API only because a user who has consented asked for it (added it, or ran an AI feature on it), and only that user, and others who have consented, get results built from it. A paper that only users who have not consented can see is never sent. This is a design call for the owner to confirm.
 4. **Retrieved text is data, not instructions.** PDF text can contain prompt injection. Model output never triggers a write by itself: plug-ins and chat propose, a person applies.
 5. **Escape the output.** Model text is escaped or rendered through a sanitiser before it reaches the page.
 6. **Keys and logs.** Keys come from the environment or are masked in the UI. Prompts, passages and keys are not written to logs; usage (counts, tokens, model) is, under the existing 30-day retention.
@@ -186,8 +186,8 @@ Each phase ends with passing tests and something a person can try. Sizes are rel
 
 | Phase | Content | Size |
 |---|---|---|
-| 0. Benchmark | Embed 50 papers with `nomic-embed-text` and `mxbai-embed-large` on the `tars` GPU (through the host Ollama) and, if allowed, with one cloud model; measure time; build 20 known-item queries from the real library (a paraphrase of a title should find the paper) and compare. Decide model and dimensions. Only unmarked material goes to a cloud model. | S |
-| 1. Foundation | `ai.db`, settings, the two interfaces, the OpenAI-compatible adapter (Ollama and cloud), the fake provider, job table, worker process and its compose profile, chunker, paper vectors, admin "AI" page (status, test connection, progress), the "never send to outside AI" project mark. | M |
+| 0. Benchmark | Embed 50 papers with two or three embedding models from the API that will be used (the cloud model chosen, plus `nomic-embed-text` and `mxbai-embed-large` through the host Ollama as a free comparison); measure time and cost; build 20 known-item queries from the real library (a paraphrase of a title should find the paper) and compare. Decide model and dimensions. Papers sent in the benchmark are only those whose holder has agreed to it. | S |
+| 1. Foundation | `ai.db`, settings, the two interfaces, the OpenAI-compatible adapter (cloud and any compatible server), the fake provider, job table, worker process and its compose profile, chunker, paper vectors, admin "AI" page (master switch, status, test connection, progress). The per-user switch and notice are done. | M |
 | 2. Semantic search | VectorStore search, "Meaning" and "Meaning + words" modes, "Similar papers", visibility and removal tests, deletion hooks. | M |
 | 3. Inside a paper | Search inside an opened paper (words, then meaning), passages with page links, then chat with the paper: retrieval, streaming, citations with pages, context meter, budgets. | M |
 | 4. Plug-in framework v1 | Registry, manifest, `http` runtime and protocol, admin page, `plugin/run`, two example plug-ins (tag suggester, summariser), `docs/plugins.md`. The API is frozen only after the second example works. | L |
@@ -209,9 +209,9 @@ The plug-in framework comes after the first two features on purpose: an interfac
 
 | Risk | Mitigation |
 |---|---|
-| Local embedding is too slow on `tars` | Phase 0 measures it. Paper-level embedding is small enough for a slow CPU. |
+| Embedding cost or rate limits of the API | Paper-level embedding is small (title plus the first 2,000 characters); the admin sets a daily token budget and the job queue backs off on rate limits. |
 | Vectors in PHP get slow at passage scale | Search is paper-level across the library and passage-level only inside one paper, so the number of vectors compared stays in the hundreds or low thousands. |
-| Users send licensed text to a cloud provider by accident | Two switches, per-project "never external", off by default. |
+| Users send licensed text to a cloud provider without understanding it | Off by default, a plain notice, and a recorded acknowledgement per user (versioned). |
 | Plug-in code reads everything | `http` runtime is recommended; `php` plug-ins are labelled as full trust. |
 | Model quality is poor on this library | Phase 0 gate: no further work until known-item queries pass. |
 | Cost surprises | Budgets, usage log, and a cost estimate shown before a full re-index. |
@@ -222,13 +222,13 @@ Made on 2026-11-10
 
 | # | Question | Decision |
 |---|---|---|
-| 1 | Where embeddings run | Both local and cloud, behind the same provider interface. Local is the default. |
+| 1 | Where embeddings run | From an API, behind the provider interface (cloud first; any OpenAI-compatible server works too, including a local one). Text may leave `tars` once the user has allowed it with the per-user switch and acknowledged the notice. |
 | 2 | Hardware and model servers | `tars` has an RTX 4070 (12 GB) and already runs a host-level Ollama and Open WebUI. **No model server is shipped with or inside the app image or its compose file.** The app only calls an API that the administrator points it at (section 10). |
 | 3 | Language | English only for now. An English embedding model is enough. Multilingual support is a later switch of model, not a redesign. |
 | 5 | Granularity | Paper-level search first. After a paper is opened, a person can search inside that paper (section 3.6). Library-wide passage search is left out. |
 | 6 | Plug-in runtime | Separate services over signed HTTP are the main route. In-app PHP plug-ins are only for small trusted adapters. |
 
-Decision 4 (full text of the shared paywalled issues) is explained in section 11 and still needs your answer.
+Decision 4 (PDF text and outside services) is settled in section 11.
 
 ## 10. Docker: options for the images
 
@@ -315,31 +315,23 @@ Both fit at once. Phase 0 compares these with a cloud embedding model on real pa
 
 I would make the app image and the worker the same image, so there is one build to keep current.
 
-## 11. Decision 4, explained: may the shared journal PDFs go to an outside service?
+## 11. Decision 4: PDF text and outside services (settled)
 
-This is about the paywalled journal issues you plan to share with your invited users.
+Decided: embeddings come from an API, and text may leave `tars` once a user has allowed it through the per-user switch.
 
-What "sending" means. Cloud embedding and cloud chat both send text to another company's servers. For semantic search that is the paper's title and the opening of its text. For chat it is the passages that answer the question. Nothing leaves `tars` when the model runs locally (Ollama).
+What is sent. For semantic search, the paper's title and the opening of its text (about 2,000 characters). For chat, the passages that answer the question.
 
-Why it can matter. Publishers license journal content to a subscriber. Their terms usually say what you may do with downloaded PDFs. Some publishers explicitly forbid giving their content to AI services; some allow it for the subscriber's own non-commercial use; many have not said. The app cannot know which applies, and the rule is about the publisher's contract with you, not about the software. I cannot tell you what your licenses say, and this is not legal advice.
+Why the notice exists. Publishers license journal content to a subscriber, and some forbid giving it to AI services. The application cannot know which applies. So each user is told, in plain words, that accepting allows their PDF text to be sent to the outside service, and must acknowledge it. The acknowledgement is stored with the notice version and the time.
 
-What the design does about it, whichever you choose.
+What the design does.
 
-1. **Local is the default and sends nothing out.** With the host Ollama on the RTX 4070, semantic search over the shared journals and chat with a paper can both run entirely on `tars`.
-2. **The administrator controls cloud use with a global switch** ("allow text to leave this server"), off by default.
-3. **A project can be marked "never send to outside AI".** Papers in it are embedded locally or not at all, even if the global switch is on. The shared journal projects would carry this mark.
-4. **The mark follows the paper.** A paper that is in a marked project and in another project is treated as marked everywhere, so a copy in a second project cannot be used to get around it.
-5. **No quiet fallback.** If the local model is down, a marked paper waits; it is never sent to the cloud instead.
+1. **Off until allowed.** Nothing is sent for a user who has not turned the switch on and acknowledged the current notice.
+2. **Administrator master switch.** The administrator can turn AI features off for the server, and configures the API and keys.
+3. **Consent follows the sender.** A paper is sent only because a consenting user asked for it. A paper visible only to users who have not consented is never sent. Search and chat results are shown only to consenting users, and only for papers they can see.
+4. **No quiet fallback.** If the API fails, the job waits and retries; text is never rerouted to another service.
+5. **Withdrawing.** A user can switch off at any time; their requests stop. Vectors already built stay (they are deleted with the article, section 4 rule 8).
 
-The per-user switch (section 4, rule 1) adds a second line of defence: nobody's text is used, even locally, until that person has turned the features on and acknowledged the notice. It does not replace the project mark: the mark protects a paper from the choices of any one user, the acknowledgement records that each user was told.
-
-The practical question for you: choose one.
-
-- **Strict:** the shared journal projects are marked, and their text stays on `tars` (my recommendation unless you have read your licenses).
-- **Open:** the journals may use cloud models too (for example because your licenses allow it, or because the papers are open access).
-- **Decide later:** ship with the strict rule as the default and the switch off.
-
-Unmarked projects (your own thesis chapters, a group reading list) are your own material and follow only the global switch.
+Dropped from earlier drafts: the "allow text to leave this server" switch and the per-project "never send to outside AI" mark. If a project owner later wants an exclusion mark, it can be added without changing the rest.
 
 ## 12. Searching inside a paper (decision 5)
 
