@@ -220,7 +220,10 @@ HTML
         // Notebook: offered only to someone for whom AI features are allowed.
         try {
 
-            \Librarian\Ai\AiGate::check($this->app_settings->getGlobal(), $this->app_settings->getUser(), true);
+            if (\Librarian\Ai\AiGate::offered($this->app_settings->getGlobal(), $this->app_settings->getUser()) === false) {
+
+                throw new Exception('AI features are not available to this user');
+            }
 
             array_splice($menu_arr, 4, 0, [[
                 'label' => "{$discuss_icon}{$this->lang->t9n('Notebook')}",

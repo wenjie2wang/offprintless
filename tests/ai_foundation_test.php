@@ -77,6 +77,13 @@ check('no chat model: 503', refused(fn() => AiGate::check(['ai_chat_model' => ''
 check('embeddings not required for chat-only check', AiGate::check(['ai_embed_model' => ''] + $global, $user, false) === null);
 check('embeddings required when asked', refused(fn() => AiGate::check(['ai_embed_model' => ''] + $global, $user, true), 503));
 
+echo "--- the menu entry shows once the switches allow it, even if setup is unfinished ---\n";
+check('both switches on, nothing configured: entry is offered', AiGate::offered(['ai_enabled' => '1'], $user) === true);
+check('server switch off: not offered', AiGate::offered(['ai_enabled' => '0'] + $global, $user) === false);
+check('user switch off: not offered', AiGate::offered($global, ['ai_enabled' => '0'] + $user) === false);
+check('stale acknowledgement: not offered', AiGate::offered($global, ['ai_ack_version' => 'old'] + $user) === false);
+check('an unfinished setup still fails the check itself with 503', refused(fn() => AiGate::check(['ai_enabled' => '1'], $user, true), 503));
+
 echo "--- usage budget ---\n";
 $meter = new UsageMeter($db);
 check('nothing used today', $meter->today(5) === 0);

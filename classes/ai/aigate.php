@@ -41,4 +41,14 @@ final class AiGate {
 
         return null;
     }
+
+    /**
+     * Should the menu offer the AI entries? Yes once the server switch is on and this user has acknowledged the notice.
+     * Unfinished setup (no address or model yet) does not hide them: the page then says what is missing, which is better
+     * than an entry that is simply not there.
+     */
+    public static function offered(array $global, array $user): bool {
+
+        return ($global['ai_enabled'] ?? '0') === '1' && AiConsent::allowed($user);
+    }
 }

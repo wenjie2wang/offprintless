@@ -261,7 +261,10 @@ class ItemView extends TextView {
         // Chat with the paper: offered only to someone for whom AI features are allowed.
         try {
 
-            \Librarian\Ai\AiGate::check($this->app_settings->getGlobal(), $this->app_settings->getUser(), true);
+            if (\Librarian\Ai\AiGate::offered($this->app_settings->getGlobal(), $this->app_settings->getUser()) === false) {
+
+                throw new Exception('AI features are not available to this user');
+            }
 
             $menu_arr[] = [
                 'label' => "{$discuss_icon}{$this->lang->t9n('Chat')}",
