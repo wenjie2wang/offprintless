@@ -525,6 +525,14 @@ final class Factory {
             ]);
         });
 
+        // AI vectors, chats and usage. Can be deleted; everything in it is rebuilt from the PDFs.
+        $this->di->set('Db_ai', function () {
+
+            return new \Librarian\Storage\Database([
+                'dbname' => IL_DB_PATH . DIRECTORY_SEPARATOR . 'ai.db'
+            ]);
+        });
+
         // Styles.
         $this->di->set('Db_styles', function () {
 
@@ -552,6 +560,23 @@ final class Factory {
     private function libraries(): void {
 
         // Guzzle
+        // Embedding and chat services for the AI features, built from the administrator's settings. Tests replace it.
+        $this->di->set('AiProviders', function () {
+
+            $settings = $this->di->getShared('AppSettings');
+            $g = $settings->getGlobal();
+            $client = $this->di->get('HttpClient', [['timeout' => 120, 'connect_timeout' => 10]]);
+            $provider = new \Librarian\Ai\OpenAiCompatible($client, [
+                'base_url'       => $g['ai_base_url'],
+                'api_key'        => $settings->apiKey('ai', $_SERVER, true),
+                'embed_model'    => $g['ai_embed_model'],
+                'chat_model'     => $g['ai_chat_model'],
+                'context_window' => (int) $g['ai_context_window']
+            ]);
+
+            return ['embed' => $provider, 'chat' => $provider];
+        });
+
         $this->di->set('HttpClient', function (array $settings = []) {
 
             return new \GuzzleHttp\Client($settings);

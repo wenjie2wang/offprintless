@@ -258,6 +258,22 @@ class ItemView extends TextView {
             'attrs' => 'class="add-id-link"'
         ];
 
+        // Chat with the paper: offered only to someone for whom AI features are allowed.
+        try {
+
+            \Librarian\Ai\AiGate::check($this->app_settings->getGlobal(), $this->app_settings->getUser(), true);
+
+            $menu_arr[] = [
+                'label' => "{$discuss_icon}{$this->lang->t9n('Chat')}",
+                'link'  => '#chat?id=',
+                'attrs' => 'class="add-id-link"'
+            ];
+
+        } catch (Exception $exc) {
+
+            // Switched off, not acknowledged or not set up: no menu entry.
+        }
+
         $menu_arr[] = [
             'label'   => "{$keyboard}{$this->lang->t9n('Extended keyboard')}",
             'link'    => '#',

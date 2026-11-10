@@ -14,6 +14,7 @@ use PDO;
  * @method void updateItemsAuthorsPrimaryIndex()
  * @method void createProjectAccessModel()
  * @method void restoreAuthorIndex()
+ * @method void createAiDatabase()
  */
 class InstallationModel extends Model {
 
@@ -170,6 +171,37 @@ class InstallationModel extends Model {
 
             copy($from, $to);
         }
+    }
+
+    /**
+     * Create ai.db (vectors, chats, usage) when it is missing. Safe to repeat.
+     *
+     * @throws Exception
+     */
+    protected function _createAiDatabase(): void {
+
+        $db = $this->di->get('Db_ai');
+        $db->connect();
+        $db->run("SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'vectors'");
+
+        $missing = (int) $db->getResult() === 0;
+
+        // An unfinished read would keep SQLite in a transaction, and journal_mode cannot change inside one.
+        $db->getPDOStatement()->closeCursor();
+
+        if ($missing) {
+
+            $file = IL_APP_PATH . DIRECTORY_SEPARATOR . 'media' . DIRECTORY_SEPARATOR . 'ai.sql';
+
+            if (is_readable($file) === false) {
+
+                throw new Exception("installation failed: could not read the <kbd>$file</kbd> file");
+            }
+
+            $db->getPDO()->exec(file_get_contents($file));
+        }
+
+        $db->close();
     }
 
     /**

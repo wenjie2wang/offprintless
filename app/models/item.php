@@ -1438,11 +1438,33 @@ SQL;
         foreach ($destroy as $item_id) {
 
             $this->removeItemFiles($item_id);
+            $this->removeAiData($item_id);
         }
 
         // Searches are cached per user and would still list the removed article or link.
         $this->cache->context('searches');
         $this->cache->clear();
+    }
+
+    /**
+     * Delete the vectors and chats about an article that no longer exists. They live in ai.db, outside the database
+     * transaction, and can be rebuilt, so a failure here must not undo or hide the deletion.
+     *
+     * @param int $item_id
+     */
+    private function removeAiData(int $item_id): void {
+
+        try {
+
+            $db = $this->di->get('Db_ai');
+            $db->connect();
+            (new \Librarian\Ai\VectorStore($db))->deleteItem($item_id);
+            $db->close();
+
+        } catch (\Throwable $exc) {
+
+            // ai.db is optional; leftovers are harmless because every query joins them to visible items.
+        }
     }
 
     /**

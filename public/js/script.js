@@ -2884,6 +2884,133 @@ class ItemdiscussionMainView extends View {
 
 views.itemdiscussionmain = new ItemdiscussionMainView();
 
+class ChatMainView extends View {
+    constructor() {
+        super();
+        this.parent = '#content-col';
+        this.events = {
+            'submit #chat-form': 'send',
+            'keydown #chat-question': 'keys'
+        };
+    }
+    afterRender(data) {
+        let This = this;
+        This.itemId = $('#chat-root').data('item-id');
+        This.windowSize = parseInt($('#chat-root').data('window')) || 0;
+        // Title list.
+        if (typeof itemview === 'object') {
+            itemview.clickTitle();
+            itemview.changeTitleLink();
+        }
+        $.when(model.load({url: window.IL_BASE_URL + 'index.php/chat/history?item_id=' + This.itemId})).done(function (response) {
+            _.forEach(response.messages || [], function (m) {
+                This.addMessage(m.role, m.content, m.citations || []);
+            });
+        });
+    }
+    keys(e) {
+        // Ctrl/Cmd+Enter sends.
+        if (e.which === 13 && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            $('#chat-form').trigger('submit');
+        }
+    }
+    /**
+     * Add a message to the log. Always as text: nothing a model or a PDF says becomes markup.
+     */
+    addMessage(role, text, citations) {
+        $('#chat-empty').remove();
+        let $m = $('<div class="chat-msg mb-3"></div>').addClass('chat-' + role);
+        $m.append($('<div class="small text-muted"></div>').text(role === 'user' ? 'You' : 'AI'));
+        $m.append($('<div class="chat-text" style="white-space:pre-wrap"></div>').text(text));
+        $('#chat-log').append($m);
+        if (citations && citations.length) {
+            this.addCitations($m, citations);
+        }
+        return $m;
+    }
+    addCitations($m, citations) {
+        let $c = $('<div class="small mt-1 chat-citations"></div>'), itemId = this.itemId;
+        _.forEach(citations, function (c) {
+            let $a = $('<a class="mr-3 me-3"></a>').attr('href', '#pdf/main?id=' + itemId + '&page=' + parseInt(c.page))
+                .text('[' + parseInt(c.n) + '] p. ' + parseInt(c.page)).attr('title', c.text);
+            $c.append($a);
+        });
+        $m.append($c);
+    }
+    meter(used) {
+        let w = this.windowSize;
+        $('#chat-meter').text(used + ' / ' + w);
+        $('#chat-meter-bar').css('width', (w > 0 ? Math.min(100, Math.round(100 * used / w)) : 0) + '%');
+    }
+    send(e) {
+        e.preventDefault();
+        let This = e.data.object, $q = $('#chat-question'), question = $.trim($q.val());
+        if (question === '' || This.busy) {
+            return;
+        }
+        This.busy = true;
+        $('#chat-error').text('');
+        $('#chat-send').prop('disabled', true);
+        This.addMessage('user', question, []);
+        $q.val('');
+        let $answer = This.addMessage('assistant', '', []), $text = $answer.find('.chat-text'), got = '';
+        let finish = function () {
+            This.busy = false;
+            $('#chat-send').prop('disabled', false);
+        };
+        let body = new URLSearchParams({item_id: This.itemId, question: question, csrfToken: window.csrfToken});
+        fetch(window.IL_BASE_URL + 'index.php/chat/send', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'text/event-stream'},
+            body: body.toString()
+        }).then(function (response) {
+            if (!response.ok) {
+                return response.json().catch(function () { return {}; }).then(function (j) {
+                    throw new Error(j.error || ('Error ' + response.status));
+                });
+            }
+            let reader = response.body.getReader(), decoder = new TextDecoder(), buffer = '';
+            let handle = function (event) {
+                if (event.t !== undefined) {
+                    got += event.t;
+                    $text.text(got);
+                } else if (event.error !== undefined) {
+                    $('#chat-error').text(event.error);
+                } else if (event.done !== undefined) {
+                    This.addCitations($answer, event.done.citations || []);
+                    This.meter((event.done.meter || {}).used || 0);
+                }
+            };
+            let pump = function () {
+                return reader.read().then(function (r) {
+                    if (r.done) {
+                        return;
+                    }
+                    buffer += decoder.decode(r.value, {stream: true});
+                    let parts = buffer.split('\n\n');
+                    buffer = parts.pop();
+                    _.forEach(parts, function (part) {
+                        if (part.indexOf('data: ') === 0) {
+                            try { handle(JSON.parse(part.substr(6))); } catch (err) { /* ignore a broken line */ }
+                        }
+                    });
+                    return pump();
+                });
+            };
+            return pump();
+        }).catch(function (err) {
+            $('#chat-error').text(err.message);
+            if (got === '') {
+                $answer.remove();
+            }
+        }).then(finish);
+    }
+}
+
+views.chatmain = new ChatMainView();
+
 /**
  * Item tags.
  */

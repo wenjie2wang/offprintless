@@ -58,6 +58,14 @@ final class AppSettings {
      * Default global settings.
      */
     public array $default_global_settings = [
+        'ai_base_url'         => '',
+        'ai_chat_model'       => '',
+        'ai_context_window'   => '32000',
+        'ai_daily_tokens'     => '200000',
+        'ai_embed_model'      => '',
+        'ai_enabled'          => '0',
+        'ai_max_request_tokens' => '24000',
+        'api_ai'              => '',
         'api_crossref'        => '',
         'api_elsevier'        => '',
         'api_ieee'            => '',
