@@ -378,7 +378,7 @@ final class AppSettings {
     /**
      * Get API key.
      *
-     * API keys can be defined in server conf as IL_API_NAME, or in global settings as api_name.
+     * API keys can be defined in server conf as OFFPRINTLESS_API_NAME (the old IL_API_NAME still works), or in global settings as api_name.
      *
      * @param string $name API key name.
      * @param array $server Server super globals.
@@ -388,10 +388,13 @@ final class AppSettings {
      */
     public function apiKey(string $name, array $server, bool $optional = false): string {
 
-        // First, look in server globals.
-        if (!empty($server['IL_API_' . strtoupper($name)])) {
+        // First, look in server globals: OFFPRINTLESS_API_NAME, then the old IL_API_NAME so existing setups keep working.
+        foreach (['OFFPRINTLESS_API_', 'IL_API_'] as $prefix) {
 
-            return $server['IL_API_' . strtoupper($name)];
+            if (!empty($server[$prefix . strtoupper($name)])) {
+
+                return $server[$prefix . strtoupper($name)];
+            }
         }
 
         // Second, look in global settings.

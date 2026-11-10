@@ -1166,7 +1166,7 @@ EOT;
             . '<label><input type="radio" name="settings[ai_enabled]" value="0"' . $off . '> ' . $t('off') . '</label>'
             . '<div class="text-muted small">' . $t('Each user must also turn AI features on in their own settings and acknowledge the notice. Text from PDFs is sent to the service below.') . '</div></div>'
             . $row('ai-base-url', 'ai_base_url', 'Service address', 'The OpenAI-compatible address, e.g. https://api.openai.com/v1 or http://host:11434/v1 for Ollama.')
-            . $row('ai-api-key', 'api_ai', 'API key', 'Can also be set as IL_API_AI in the web server configuration, which takes precedence.', 'password')
+            . $row('ai-api-key', 'api_ai', 'API key', 'Can also be set as OFFPRINTLESS_API_AI in the web server configuration, which takes precedence.', 'password')
             . $row('ai-chat-model', 'ai_chat_model', 'Chat model')
             . $row('ai-embed-model', 'ai_embed_model', 'Embedding model')
             . $row('ai-context', 'ai_context_window', 'Context window of the chat model (tokens)')

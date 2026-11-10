@@ -29,7 +29,7 @@ Non-goals
 | There is no cron or worker process in the image. PHP request time is 300 s. | `start.local.sh` | Embedding needs a background worker, started by the container script. |
 | `tars` has 28 cores and 64 GB of memory. Whether it has a GPU is not known. | `nproc`, `free` | Local embedding is plausible. Its speed is not measured and is the first thing to benchmark. |
 | `pdftotext` output keeps form feeds between pages, and the app already stores it. | `PdfModel::_save` | Chunks can carry page numbers cheaply, so chat citations can say "p. 7". |
-| API keys are kept in the `settings` table as plain text. The `IL_API_*` environment variables override them. | `AppSettings::apiKey` | AI keys must come from the environment or be masked and never logged. |
+| API keys are kept in the `settings` table as plain text. The `OFFPRINTLESS_API_*` environment variables (the old `IL_API_*` still work) override them. | `AppSettings::apiKey` | AI keys must come from the environment or be masked and never logged. |
 
 ## 3. Architecture
 
@@ -273,7 +273,7 @@ The model servers themselves are entered on the administrator's AI page (or as e
 | Embeddings | base URL, API key, model name | Ollama at `http://host.docker.internal:11434`, `nomic-embed-text` |
 | Chat | base URL, API key, model name | Open WebUI at `http://host.docker.internal:3000/api`, `qwen3:14b`; or Ollama directly |
 
-They are separate on purpose. Embeddings can use Ollama directly (small, fast) while chat goes through Open WebUI, and either may be a cloud service. Keys are never shown after saving, and the `IL_API_*` style environment variables override stored ones.
+They are separate on purpose. Embeddings can use Ollama directly (small, fast) while chat goes through Open WebUI, and either may be a cloud service. Keys are never shown after saving, and the `OFFPRINTLESS_API_*` style environment variables override stored ones.
 
 Any server that speaks the OpenAI-style API works with one adapter: Ollama (`/v1`), Open WebUI, LM Studio, vLLM, llama.cpp's server, and cloud services. Anthropic's chat API has its own small adapter.
 
