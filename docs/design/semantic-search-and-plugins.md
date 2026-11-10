@@ -222,7 +222,7 @@ Made on 2026-11-10
 | # | Question | Decision |
 |---|---|---|
 | 1 | Where embeddings run | Both local and cloud, behind the same provider interface. Local is the default. |
-| 2 | Hardware | `tars` has an RTX 4070 (12 GB) and already runs a host-level Ollama (see section 10). An Ollama container is optional. |
+| 2 | Hardware and model servers | `tars` has an RTX 4070 (12 GB) and already runs a host-level Ollama and Open WebUI. **No model server is shipped with or inside the app image or its compose file.** The app only calls an API that the administrator points it at (section 10). |
 | 3 | Language | English only for now. An English embedding model is enough. Multilingual support is a later switch of model, not a redesign. |
 | 5 | Granularity | Paper-level search first. After a paper is opened, a person can search inside that paper (section 3.6). Library-wide passage search is left out. |
 | 6 | Plug-in runtime | Separate services over signed HTTP are the main route. In-app PHP plug-ins are only for small trusted adapters. |
@@ -231,25 +231,20 @@ Decision 4 (full text of the shared paywalled issues) is explained in section 11
 
 ## 10. Docker: options for the images
 
-### 10.1 What `tars` already has (read-only check)
+### 10.1 Principle: the app calls a model server, it does not contain one
 
-- GPU: NVIDIA RTX 4070, 12 GB, driver 615.78, about 0.6 GB in use.
-- Docker with the NVIDIA container toolkit installed (`nvidia-ctk`, `nvidia-container-runtime`) and Compose 5.7.
-- A **host-level Ollama 0.40.15**, running as a system service, listening on all interfaces (`OLLAMA_HOST=0.0.0.0:11434`), with models `qwen3:14b` and `qwen2.5-coder:14b` (about 9 GB each) in `/var/lib/ollama`.
-- Open WebUI (the `cuda` image) is also running and uses that Ollama.
-- Port 11434 is taken by the host service, so a second Ollama cannot bind to it.
+Neither the app image nor `docker-compose.yml` includes Ollama, a model, or a GPU reservation. This keeps the image small and leaves the choice, the hardware and the model files to the administrator. The only AI-related thing the repository adds to Docker is the indexing worker (section 10.3), which is the same image as the app.
 
-This matters: a second Ollama container on the same GPU would load a second copy of each model into 12 GB of video memory, and it would download the same models again. Reusing the existing service is cheaper and safer.
+### 10.2 What `tars` already has (read-only check)
 
-### 10.2 Three ways to give the app a model server
+- GPU: NVIDIA RTX 4070, 12 GB, driver 615.78.
+- A **host-level Ollama 0.40.15** (system service, `OLLAMA_HOST=0.0.0.0:11434`) with `qwen3:14b` and `qwen2.5-coder:14b`.
+- **Open WebUI 0.10.2** (the `cuda` image) on port 3000. It requires an API key (an unauthenticated call returns 401).
+- I could not confirm from outside which API paths Open WebUI offers (its `/openapi.json` returned a web page, not a specification). The paths it is documented to offer, and whether it offers embeddings at all, are checked in Phase 0 by the app's "Test connection" (section 10.4), not assumed.
 
-| Option | What it is | When to pick it |
-|---|---|---|
-| A. `external` (default) | The app talks to an Ollama or OpenAI-compatible server that already exists. On `tars`: the host Ollama at `http://host.docker.internal:11434`. | `tars` today. Nothing new to run. |
-| B. `ollama` profile | An Ollama container added to the compose file, with the GPU reserved, its own named volume for models, and a different host port. | A machine with no Ollama. It is optional and off unless the profile is named. |
-| C. `none` | No model server. Only cloud providers, or no AI features. | A small VPS, or a person who wants nothing local. |
+### 10.3 What the app needs to be told
 
-How the choice is made in `docker-compose.yml` (compose profiles, so the default `docker compose up -d` starts only the app, as it does now):
+Compose adds only environment settings and the worker. The default `docker compose up -d` is unchanged.
 
 ```yaml
 services:
@@ -257,46 +252,56 @@ services:
     # ... as today ...
     environment:
       - OP_AI_ENABLED=${OP_AI_ENABLED:-0}
-      - OP_AI_OLLAMA_URL=${OP_AI_OLLAMA_URL:-http://host.docker.internal:11434}
       - OP_AI_ALLOW_EXTERNAL=${OP_AI_ALLOW_EXTERNAL:-0}
     extra_hosts:
-      - "host.docker.internal:host-gateway"     # lets the container reach the host's Ollama
+      - "host.docker.internal:host-gateway"    # reach a server on the Docker host
 
-  ollama:                                       # Option B: only with  --profile ollama
-    profiles: ["ollama"]
-    image: ollama/ollama:${OLLAMA_TAG:-latest}
-    container_name: offprintless-ollama
-    volumes:
-      - ollama-models:/root/.ollama
-    ports:
-      - "127.0.0.1:11435:11434"                 # not 11434: the host service owns it; loopback only
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    restart: unless-stopped
-
-  worker:                                       # the indexing worker, same image as the app
+  worker:                                      # indexing; same image, only with  --profile ai
     profiles: ["ai"]
     image: offprintless:project-access
     command: ["php", "/i-librarian/bin/worker.php"]
     volumes: *same-volumes-as-app
-
-volumes:
-  ollama-models:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 ```
+
+The model servers themselves are entered on the administrator's AI page (or as environment variables, which win), once for each of two roles:
+
+| Role | Settings | Example on `tars` |
+|---|---|---|
+| Embeddings | base URL, API key, model name | Ollama at `http://host.docker.internal:11434`, `nomic-embed-text` |
+| Chat | base URL, API key, model name | Open WebUI at `http://host.docker.internal:3000/api`, `qwen3:14b`; or Ollama directly |
+
+They are separate on purpose. Embeddings can use Ollama directly (small, fast) while chat goes through Open WebUI, and either may be a cloud service. Keys are never shown after saving, and the `IL_API_*` style environment variables override stored ones.
+
+Any server that speaks the OpenAI-style API works with one adapter: Ollama (`/v1`), Open WebUI, LM Studio, vLLM, llama.cpp's server, and cloud services. Anthropic's chat API has its own small adapter.
 
 Usage
 
-- Today (no AI): `docker compose up -d`.
-- AI with the host Ollama (`tars`): `docker compose --profile ai up -d`, with `OP_AI_ENABLED=1`.
-- AI with a container Ollama: `docker compose --profile ai --profile ollama up -d`, with `OP_AI_OLLAMA_URL=http://ollama:11434`.
-- A variant file, `docker-compose.cpu.yml`, removes the GPU reservation for a machine without one.
+- No AI: `docker compose up -d` (as today).
+- AI against servers you already run: set `OP_AI_ENABLED=1`, then `docker compose --profile ai up -d`.
+- Someone with no model server runs Ollama however they like (a package, or the official image on their own) and gives the app its URL. The documentation will show this in a short example, but the repository does not ship it.
 
-### 10.3 Other image options to specify
+### 10.4 "Test connection" (the AI admin page)
+
+For each role it checks, and reports in plain language: the address is reachable; the key is accepted; the model name exists (it lists the server's models); and, for embeddings, a one-sentence test returns a vector, which also reveals the number of dimensions. A server that does not offer embeddings (which may be true of an Open WebUI gateway) is reported as "this server has no embeddings endpoint; use another server for embeddings", and chat can still be configured. The app records the dimension, because the index is built for one model and one dimension.
+
+### 10.5 Networking and safety
+
+- The model server address is administrator configuration. It may be a private address; that is the one place the app is allowed to call one, and the guarded downloader that user URLs go through must not be used for it.
+- The existing host Ollama listens on every interface. That is how a container can reach it, but it also means any machine that can reach `tars` on port 11434 can use the GPU. The containers on `tars` use the bridge (`172.17.0.1`) and the `cloudflare-tunnel` network (`172.19.0.1`). The host firewall should allow 11434 only from the Docker networks and the local network. I could not read the firewall (it needs sudo), so this is for you to check.
+- Models are not baked into any image. They live wherever the model server keeps them (on `tars`, `/var/lib/ollama`).
+
+### 10.6 Models that fit a 12 GB card
+
+| Job | Suggested model (English) | Memory |
+|---|---|---|
+| Embeddings | `nomic-embed-text` (768 dimensions) or `mxbai-embed-large` (1024) | under 1 GB |
+| Chat | `qwen3:14b` (already on `tars`) | about 9 GB, leaving room for the embedder |
+
+Both fit at once. Phase 0 compares these with a cloud embedding model on real papers before one is chosen. A chat model and an embedding model loaded together can be evicted by Open WebUI if it loads a large model, so the app must handle "model not loaded yet" with a retry and a clear message.
+
+### 10.7 Other image build options
 
 | Option | Values | Note |
 |---|---|---|
@@ -305,26 +310,9 @@ Usage
 | `CADDY_VERSION` | e.g. `2.10.2` | exists |
 | `WITH_OCR` | `0` / `1` | installs tesseract; off by default, as in the design notes |
 | `WITH_OFFICE` | `0` / `1` | installs LibreOffice for Office import. The current image installs it unconditionally; making it a build option shrinks the default image by several hundred MB |
-| `OLLAMA_TAG` | image tag | pin a version for the optional container |
 | `OP_AI_*` | see above | runtime settings, not build settings |
 
 I would make the app image and the worker the same image, so there is one build to keep current.
-
-### 10.4 Networking and safety
-
-- The model server address is administrator configuration. It may be a private address; that is the one place the app is allowed to call one, and the guarded downloader that user URLs go through must not be used for it.
-- The existing host Ollama listens on every interface. That is how a container can reach it, but it also means any machine that can reach `tars` on port 11434 can use the GPU. The containers on `tars` use the bridge (`172.17.0.1`) and the `cloudflare-tunnel` network (`172.19.0.1`). The host firewall should allow 11434 only from the Docker networks and the local network. I could not read the firewall (it needs sudo), so this is for you to check.
-- The Ollama container, if used, publishes only on `127.0.0.1`.
-- Models are not baked into any image. They live in the Ollama volume or in `/var/lib/ollama`.
-
-### 10.5 Models that fit a 12 GB card
-
-| Job | Suggested model (English) | Memory |
-|---|---|---|
-| Embeddings | `nomic-embed-text` (768 dimensions) or `mxbai-embed-large` (1024) | under 1 GB |
-| Chat | `qwen3:14b` (already on `tars`) | about 9 GB, leaving room for the embedder |
-
-Both fit at once. Phase 0 compares these with a cloud embedding model on real papers before one is chosen. A chat model and an embedding model loaded together can be evicted by Open WebUI if it loads a large model, so the app must handle "model not loaded yet" with a retry and a clear message.
 
 ## 11. Decision 4, explained: may the shared journal PDFs go to an outside service?
 
