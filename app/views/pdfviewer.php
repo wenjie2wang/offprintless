@@ -361,6 +361,7 @@ HTML;
         $el = null;
 
         $page_count = $info['pdf_info']['page_count'];
+        $total_pages = (int) $page_count;
 
         $page_num = <<<EOT
             <input
@@ -369,7 +370,9 @@ HTML;
                 id="pdfviewer-page-input"
                 maxlength="6"
                 class="form-control bg-light border-0 d-inline rounded-0 px-2 py-0"
-                style="transform: translateY(2px);height: 2.1rem;width: 3.4rem">
+                style="transform: translateY(2px);height: 2.1rem;width: 3.4rem"
+                aria-label="{$this->lang->t9n('Page')}">
+            <span id="pdfviewer-page-total" class="d-inline-block pl-1 ps-1 pr-2 pe-2" title="{$this->lang->t9n('Total pages')}">/{$total_pages}</span>
 EOT;
 
         /** @var Bootstrap\IconButton $el */
