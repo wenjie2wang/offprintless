@@ -124,6 +124,15 @@ class ItemView extends TextView {
         $el = $this->di->get('Icon');
 
         $el->addClass('mdi-24px mr-2');
+        $el->icon('creation');
+        $chat_icon = $el->render();
+
+        $el = null;
+
+        /** @var Bootstrap\Icon $el */
+        $el = $this->di->get('Icon');
+
+        $el->addClass('mdi-24px mr-2');
         $el->icon('keyboard-variant');
         $keyboard = $el->render();
 
@@ -267,7 +276,7 @@ class ItemView extends TextView {
             }
 
             $menu_arr[] = [
-                'label' => "{$discuss_icon}{$this->lang->t9n('Chat')}",
+                'label' => "{$chat_icon}{$this->lang->t9n('Chat')}",
                 'link'  => '#chat?id=',
                 'attrs' => 'class="add-id-link"'
             ];

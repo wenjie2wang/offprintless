@@ -110,6 +110,15 @@ class ProjectView extends TextView {
 
         $el = null;
 
+        /** @var Bootstrap\Icon $el */
+        $el = $this->di->get('Icon');
+
+        $el->addClass('mdi-24px mr-2');
+        $el->icon('notebook');
+        $notebook_icon = $el->render();
+
+        $el = null;
+
 //        /** @var Bootstrap\Icon $el */
 //        $el = $this->di->get('Icon');
 //
@@ -226,7 +235,7 @@ HTML
             }
 
             array_splice($menu_arr, 4, 0, [[
-                'label' => "{$discuss_icon}{$this->lang->t9n('Notebook')}",
+                'label' => "{$notebook_icon}{$this->lang->t9n('Notebook')}",
                 'link'  => '#notebook?id=',
                 'attrs' => 'class="add-id-link"'
             ]]);

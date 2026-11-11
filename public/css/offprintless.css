@@ -357,6 +357,20 @@ body.content-dark .item-container .btn-light {
     color: var(--op-ink-2);
 }
 
+body.content-dark .item-container .btn-group-vertical > a.btn-primary,
+body.content-dark .item-container .btn-group-vertical > a.btn-primary:hover {
+    background-color: var(--op-accent);
+    border-color: var(--op-accent);
+    color: var(--op-accent-ink);
+}
+
+body.content-dark .item-container .btn-group-vertical > .btn-secondary,
+body.content-dark .item-container .btn-group-vertical > .btn-secondary:hover {
+    background-color: var(--op-accent-soft);
+    border-color: var(--op-accent-soft);
+    color: var(--op-ink);
+}
+
 body.content-dark .left-container .metismenu .mm-active > a,
 body.content-dark .left-container .metismenu .active > a {
     background: var(--op-accent-soft);
@@ -465,6 +479,28 @@ body.content-dark .bg-darker-5.border-top {
 
 .item-container a:hover {
     color: var(--op-accent);
+}
+
+/* The PDF and download tiles are links too; the rule above must not turn their text into dark ink on a dark fill. */
+.item-container a.btn-primary,
+.item-container a.btn-primary:hover,
+.item-container .btn-secondary,
+.item-container .btn-secondary:hover {
+    color: var(--op-accent-ink);
+}
+
+.item-container .btn-secondary {
+    background-color: var(--op-ink-3);
+    border-color: var(--op-ink-3);
+}
+
+/* Link-style buttons (the Edit links, Stable link) use the accent in every theme, not bootstrap blue. */
+.btn-link {
+    color: var(--op-accent);
+}
+
+.btn-link:hover, .btn-link:focus {
+    color: var(--op-accent-hover);
 }
 
 .badge-secondary {
