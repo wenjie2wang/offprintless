@@ -10,3 +10,8 @@ package.sh
 .e2e-config-*
 .e2e-data-*
 .e2e-probe
+.e2e-data/
+*.db-wal
+*.db-shm
+.DS_Store
+tests/.tracked
