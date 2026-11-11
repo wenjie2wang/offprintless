@@ -25,65 +25,7 @@ class MainView extends TextView {
 
         $this->styleLink('css/plugins.css');
 
-        // Override content-light when not authenticated.
-        // The photo backdrop belongs to the classic look. The Offprintless theme uses its own plain paper.
-        $photo_css = <<<STYLE
-body.content-light {
-    background-color: #111111;
-    background-repeat: no-repeat;
-    background-size: cover;
-    background-position: center;
-    background-image: url("img/bg-v1x.jpg");
-}
-
-@media screen and (max-resolution: 143dpi) {
-    body.content-light {
-        background-image: url("img/bg-v1x.jpg");
-    }
-}
-
-@media screen and (max-resolution: 143dpi) and (min-width: 1200px) {
-    body.content-light {
-        background-image: url("img/bg-h1x.jpg");
-    }
-}
-
-@media screen and (min-device-pixel-ratio: 2) and (min-resolution: 144dpi) {
-    body.content-light {
-        background-image: url("img/bg-v2x.jpg");
-    }
-}
-
-@media screen and (min-device-pixel-ratio: 2) and (min-resolution: 144dpi) and (min-width: 1200px) {
-    body.content-light {
-        background-image: url("img/bg-h2x.jpg");
-    }
-}
-
-.card {
-    background-color: rgba(245,250,255,0.5);
-    width: 100%;
-    max-width: 400px;
-}
-
-#version-badge {
-    position: absolute;
-    bottom: 1rem;
-    right: 1rem;
-    background-color: rgba(245,250,255,0.5);
-    padding: 0 0.5rem
-}
-
-@supports (backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px)) {
-    .card, #version-badge {
-        -webkit-backdrop-filter: blur(10px);
-        backdrop-filter: blur(10px);
-        background-color: rgba(245,250,255,0.25);
-    }
-}
-STYLE;
-
-        $this->style = $this::$theme === 'classic' ? $photo_css : <<<STYLE
+        $this->style = <<<STYLE
 .card {
     width: 100%;
     max-width: 400px;

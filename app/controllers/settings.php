@@ -86,6 +86,12 @@ class SettingsController extends AppController {
             throw new Exception('invalid value <kbd>Icons per row</kbd>', 422);
         }
 
+        // The theme is light or dark.
+        if (isset($this->post['settings']['theme']) && in_array($this->post['settings']['theme'], ['light', 'dark'], true) === false) {
+
+            throw new Exception('invalid value <kbd>Theme</kbd>', 422);
+        }
+
         // Remove non-existing settings.
         foreach (array_keys($this->post['settings']) as $key) {
 

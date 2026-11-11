@@ -58,6 +58,18 @@ abstract class TextView extends View {
     protected string $head_links = '';
     protected string $script = '';
     /**
+     * The theme to use for a stored value. There are two, light and dark. Anything else (a look this application used to
+     * have, an empty or damaged value) shows as light.
+     *
+     * @param mixed $stored
+     * @return string light or dark
+     */
+    public static function normalizeTheme($stored): string {
+
+        return $stored === 'dark' ? 'dark' : 'light';
+    }
+
+    /**
      * Version of the icon files in public/img. Change it whenever they change, so browsers fetch them again.
      */
     public const ICON_VERSION = 'offprintless-1';
@@ -94,7 +106,7 @@ abstract class TextView extends View {
         // Theme. Get setting, if logged in.
         if ($this->session->data('user_id') !== null) {
 
-            self::$theme = $this->app_settings->getUser('theme');
+            self::$theme = self::normalizeTheme($this->app_settings->getUser('theme'));
         }
 
         // Title.
@@ -203,9 +215,9 @@ abstract class TextView extends View {
 
         } else {
 
-            // "classic" is the original look; every other value gets the Offprintless theme (light or dark).
+            // Two themes: light and dark.
             $theme_class = self::$theme === 'dark' ? 'content-dark text-white' : 'content-light';
-            $theme_css = self::$theme === 'classic' ? '' : '<link href="' . IL_BASE_URL . 'css/offprintless.css?v=' . IL_VERSION . '" rel="stylesheet">';
+            $theme_css = '<link href="' . IL_BASE_URL . 'css/offprintless.css?v=' . IL_VERSION . '" rel="stylesheet">';
 
             // HTML. Construct <head> and open <body>.
             $IL_BASE_URL = IL_BASE_URL;

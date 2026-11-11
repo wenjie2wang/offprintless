@@ -61,7 +61,7 @@ PHP application with SQLite, no build step, served by Caddy and PHP-FPM in Docke
   as the rest of the application, and text from a PDF is never treated as instructions to the model.
 
 ### Interface
-- A new look with light, dark and "classic" (the original) themes, a new tab icon, readable PDF tiles in both themes, and
+- A new look with two themes, light and dark (the original's photo-backdrop look is gone), a new tab icon, readable PDF tiles, and
   a page counter such as "5 /10" in the PDF viewer.
 
 ### Security and operations
