@@ -54,7 +54,7 @@ class SemanticModel extends AppModel {
 
     private function gate(): void {
 
-        AiGate::check($this->app_settings->getGlobal(), $this->app_settings->getUser(), true);
+        AiGate::checkSemantic($this->app_settings->getGlobal(), $this->app_settings->getUser());
     }
 
     /**

@@ -325,6 +325,8 @@ One vector per paper: the title and the first 2,000 characters of its text (the 
 
 The quick search gets a **Meaning (AI)** type, shown only to people for whom AI is allowed. Results are the closest papers above a score floor (an absolute minimum, `ai_semantic_min_score`, and 60% of the best score), with a similarity badge, and paging, export, projects and the clipboard work as for any search. Each item page has **Similar papers**. Vectors are kept per embedding model and per prefix setting; changing either starts a new set. `Librarian\Ai\PaperIndex`, `SemanticModel`, `SemanticController`.
 
+**Switch.** Search by meaning has its own administrator switch, `ai_semantic_enabled`, **off by default** (Global settings, AI features, "Search by meaning"). Building the index sends the opening of every paper to the embedding service, so it must not start by itself. With the switch off, the Meaning option and Similar papers are hidden and every endpoint answers 403; vectors already built are kept, so turning it back on needs no rebuild. Chat and the notebook do not depend on it. `AiGate::semanticOffered` and `AiGate::checkSemantic`.
+
 Query and document prefixes (`ai_embed_query_prefix`, `ai_embed_doc_prefix`) are optional settings for models that rank better with them, for example `search_query:` and `search_document:` for nomic-embed-text.
 
 ## 11. Decision 4: PDF text and outside services (settled)

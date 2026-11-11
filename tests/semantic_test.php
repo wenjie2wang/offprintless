@@ -92,7 +92,7 @@ $app->sql('INSERT INTO projects_items (project_id,item_id) VALUES (10,1), (10,2)
 $fake = new FakeProvider();
 $app->di->set('AiProviders', fn() => ['embed' => $fake, 'chat' => $fake]);
 $global = ['ai_enabled' => '1', 'ai_base_url' => 'http://x', 'ai_chat_model' => 'm', 'ai_embed_model' => 'e',
-           'ai_daily_tokens' => '1000000', 'ai_max_request_tokens' => '100000', 'ai_semantic_min_score' => '0.05'];
+           'ai_daily_tokens' => '1000000', 'ai_max_request_tokens' => '100000', 'ai_semantic_min_score' => '0.05', 'ai_semantic_enabled' => '1'];
 $app->di->getShared('AppSettings')->setGlobal($global);
 $on = ['ai_enabled' => '1', 'ai_ack_version' => AiConsent::VERSION, 'ai_ack_at' => 'now'];
 $defaults = $app->di->getShared('AppSettings')->default_user_settings;
@@ -319,9 +319,9 @@ $itemv = (string) file_get_contents(__DIR__ . '/../app/views/item.php');
 $js = (string) file_get_contents(__DIR__ . '/../public/js/script.js');
 $min = (string) file_get_contents(__DIR__ . '/../public/js/script.min.js');
 check('the quick search offers Meaning', str_contains($shared, "'meaning'"));
-check('...only to people for whom AI is offered', preg_match("/AiGate::offered.*?'meaning'/s", $shared) === 1);
+check('...only to people for whom it is offered', preg_match("/AiGate::semanticOffered.*?'meaning'/s", $shared) === 1);
 check('the item menu has Similar papers, linked by id', str_contains($itemv, "'#semantic/similar?id='") || str_contains($itemv, "semantic/similar?id="));
-check('...gated like Chat', preg_match("/AiGate::offered.*?semantic\\/similar/s", $itemv) === 1);
+check('...gated by the semantic check', preg_match("/AiGate::semanticOffered.*?semantic\\/similar/s", $itemv) === 1);
 check('the item menu gives Similar papers its own icon', preg_match("/icon\\('([a-z-]+)'\\);\\s*\\\$similar_icon/", $itemv, $m) === 1 && !in_array($m[1] ?? '', ['forum', 'creation'], true), $m[1] ?? 'none');
 foreach (['source' => $js, 'minified' => $min] as $label => $code) {
     check("the build link is wired ($label)", str_contains($code, '#semantic-build') && str_contains($code, 'index.php/semantic/build'));
@@ -348,6 +348,42 @@ check('a word search still highlights its word in the PDF', (function () use ($a
     $html = (string) (json_decode($v->page('library', ['page' => 1] + $_GET, ['items' => [$row(['has_pdf' => true])], 'total_count' => 1, 'tags' => []]), true)['html'] ?? '');
     return str_contains($html, 'search=yeast');
 })());
+
+echo "=== the switch for search by meaning ===\n";
+$s = $app->di->getShared('AppSettings');
+check('the switch exists and is off by default', ($s->default_global_settings['ai_semantic_enabled'] ?? null) === '0');
+$g = ['ai_enabled' => '1', 'ai_base_url' => 'http://x', 'ai_chat_model' => 'm', 'ai_embed_model' => 'e'];
+$u = ['ai_enabled' => '1', 'ai_ack_version' => AiConsent::VERSION, 'ai_ack_at' => 'now'];
+check('offered when AI is allowed and the switch is on', Librarian\Ai\AiGate::semanticOffered(['ai_semantic_enabled' => '1'] + $g, $u) === true);
+check('not offered with the switch off', Librarian\Ai\AiGate::semanticOffered(['ai_semantic_enabled' => '0'] + $g, $u) === false);
+check('not offered when AI itself is off, whatever the switch says', Librarian\Ai\AiGate::semanticOffered(['ai_semantic_enabled' => '1', 'ai_enabled' => '0'] + $g, $u) === false);
+check('not offered to a user who has not turned AI on', Librarian\Ai\AiGate::semanticOffered(['ai_semantic_enabled' => '1'] + $g, ['ai_enabled' => '0'] + $u) === false);
+check('chat is not affected by the switch', Librarian\Ai\AiGate::offered(['ai_semantic_enabled' => '0'] + $g, $u) === true);
+
+$as($aliceH, $on);
+$app->di->getShared('AppSettings')->setGlobal(['ai_semantic_enabled' => '0'] + $global);
+$before = count($spy->texts);
+$app->di->set('AiProviders', fn() => ['embed' => $spy, 'chat' => $fake]);
+check('with the switch off, status is refused (403)', code(fn() => $app->model('SemanticModel')->status()) === 403);
+check('...build is refused (403)', code(fn() => $app->model('SemanticModel')->build()) === 403);
+check('...search is refused (403)', code(fn() => $app->model('SemanticModel')->search('yeast', 'library')) === 403);
+check('...similar is refused (403)', code(fn() => $app->model('SemanticModel')->similar(1)) === 403);
+check('...the Meaning type in the library search is refused (403)', code(fn() => $meaning('yeast')) === 403);
+check('...and nothing was sent to the embedding service', count($spy->texts) === $before);
+$d = $app->di->get('Db_ai'); $d->connect(); $d->run("SELECT count(*) FROM vectors WHERE kind='paper'"); $kept = (int) $d->getResult(); $d->close();
+check('...the vectors already built are kept', $kept > 0, (string) $kept);
+$htmloff = $page(['items' => [], 'total_count' => 0, 'tags' => []], ['search_type' => ['metadata'], 'search_query' => ['x'], 'search_boolean' => ['AND']]);
+$app->di->getShared('AppSettings')->setGlobal(['ai_semantic_enabled' => '1'] + $global);
+check('turned back on, search works again with the old vectors', (int) ($app->model('SemanticModel')->search('yeast', 'library')['total'] ?? 0) > 0);
+check('chat is untouched by the switch', Librarian\Ai\AiGate::check(['ai_semantic_enabled' => '0'] + $global, $on, false) === null);
+
+echo "=== menus follow the switch ===\n";
+$shared = (string) file_get_contents(__DIR__ . '/../app/views/sharedhtml.php');
+$itemv = (string) file_get_contents(__DIR__ . '/../app/views/item.php');
+check('the Meaning option is shown by the semantic check, not just the AI one', preg_match("/semanticOffered.*?'meaning'/s", $shared) === 1);
+check('Similar papers is shown by the semantic check', preg_match("/semanticOffered.*?semantic\\/similar/s", $itemv) === 1);
+$admin = (string) file_get_contents(__DIR__ . '/../app/views/settings.php');
+check('the administrator form has the switch', str_contains($admin, 'settings[ai_semantic_enabled]'));
 
 $out = ob_get_clean();
 echo $out;

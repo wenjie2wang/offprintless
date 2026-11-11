@@ -290,11 +290,14 @@ class ItemView extends TextView {
                 'attrs' => 'class="add-id-link"'
             ];
 
-            $menu_arr[] = [
-                'label' => "{$similar_icon}{$this->lang->t9n('Similar papers')}",
-                'link'  => '#semantic/similar?id=',
-                'attrs' => 'class="add-id-link"'
-            ];
+            if (\Librarian\Ai\AiGate::semanticOffered($this->app_settings->getGlobal(), $this->app_settings->getUser())) {
+
+                $menu_arr[] = [
+                    'label' => "{$similar_icon}{$this->lang->t9n('Similar papers')}",
+                    'link'  => '#semantic/similar?id=',
+                    'attrs' => 'class="add-id-link"'
+                ];
+            }
 
         } catch (Exception $exc) {
 

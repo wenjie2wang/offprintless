@@ -68,6 +68,7 @@ final class AppSettings {
         'ai_embed_query_prefix' => '',
         'ai_enabled'          => '0',
         'ai_max_notebook_papers' => '12',
+        'ai_semantic_enabled' => '0',
         'ai_semantic_min_score' => '0.3',
         'ai_max_request_tokens' => '24000',
         'api_ai'              => '',

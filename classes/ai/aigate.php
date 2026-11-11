@@ -51,4 +51,31 @@ final class AiGate {
 
         return ($global['ai_enabled'] ?? '0') === '1' && AiConsent::allowed($user);
     }
+
+    /**
+     * Should the menus offer search by meaning and Similar papers? Everything that offers AI at all, plus the
+     * administrator's own switch for this feature, which is off until it is turned on: building the index sends the text
+     * of every paper to the embedding service, so it must not start on its own.
+     */
+    public static function semanticOffered(array $global, array $user): bool {
+
+        return self::offered($global, $user) && ($global['ai_semantic_enabled'] ?? '0') === '1';
+    }
+
+    /**
+     * The check every part of search by meaning runs first: the usual one, then the switch.
+     *
+     * @throws Exception 403, 503
+     */
+    public static function checkSemantic(array $global, array $user): ?string {
+
+        self::check($global, $user, true);
+
+        if (($global['ai_semantic_enabled'] ?? '0') !== '1') {
+
+            throw new Exception('search by meaning is turned off on this server', 403);
+        }
+
+        return null;
+    }
 }

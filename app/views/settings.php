@@ -1176,6 +1176,11 @@ EOT;
             . $row('ai-embed-model', 'ai_embed_model', 'Embedding model')
             . $row('ai-embed-query-prefix', 'ai_embed_query_prefix', 'Prefix for a question (optional)', 'Some models need it, e.g. "search_query: " for nomic-embed-text. Leave empty if unsure. Changing it rebuilds the search index.')
             . $row('ai-embed-doc-prefix', 'ai_embed_doc_prefix', 'Prefix for a paper (optional)', 'e.g. "search_document: " for nomic-embed-text.')
+            . '<div class="mt-3"><b>' . $t('Search by meaning') . '</b></div>'
+            . '<div class="mb-2">'
+            . '<label class="mr-4 me-4" style="margin-right:1.5rem"><input type="radio" class="mr-1 me-1" name="settings[ai_semantic_enabled]" value="1"' . (($settings['ai_semantic_enabled'] ?? '0') === '1' ? ' checked' : '') . '> ' . $t('on') . '</label>'
+            . '<label><input type="radio" class="mr-1 me-1" name="settings[ai_semantic_enabled]" value="0"' . (($settings['ai_semantic_enabled'] ?? '0') === '1' ? '' : ' checked') . '> ' . $t('off') . '</label>'
+            . '<div class="text-muted small">' . $t('Adds a Meaning option to the search and Similar papers to each item. Building the index sends the opening of every paper to the embedding service. Needs an embedding model above. Off by default.') . '</div></div>'
             . '<div class="mt-3"><b>' . $t('Limits') . '</b></div>'
             . $row('ai-context', 'ai_context_window', 'Context window of the chat model (tokens)')
             . $row('ai-daily', 'ai_daily_tokens', 'Tokens per user per day (0 for no limit)')
