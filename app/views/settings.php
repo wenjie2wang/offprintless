@@ -1903,24 +1903,6 @@ HTML
         /** @var Bootstrap\Input $el */
         $el = $this->di->get('Input');
 
-        $el->id('soffice-path');
-        $el->groupClass('mt-3');
-        $el->name('settings[soffice_path]');
-        $el->label("LibreOffice {$this->lang->t9n('path')}");
-        $el->hint($this->lang->t9n('If it is not set in the OS environment'));
-
-        if (!empty($settings['soffice_path'])) {
-
-            $el->value($settings['soffice_path']);
-        }
-
-        $options_right = $el->render();
-
-        $el = null;
-
-        /** @var Bootstrap\Input $el */
-        $el = $this->di->get('Input');
-
         $el->id('tesseract-path');
         $el->name('settings[tesseract_path]');
         $el->label("Tesseract OCR {$this->lang->t9n('path')}");
@@ -1931,7 +1913,7 @@ HTML
             $el->value($settings['tesseract_path']);
         }
 
-        $options_right .= $el->render();
+        $options_right = $el->render();
 
         $el = null;
 

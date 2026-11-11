@@ -25,11 +25,6 @@ RUN apt update && \
     php-intl \
     php-ldap \
     ghostscript \
-    libreoffice-calc \
-    libreoffice-draw \
-    libreoffice-impress \
-    libreoffice-math \
-    libreoffice-writer \
     poppler-utils \
     tesseract-ocr && \
 	apt-get clean && \

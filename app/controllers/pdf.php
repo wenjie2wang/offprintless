@@ -291,50 +291,9 @@ class PdfController extends AppController {
 
         } else {
 
-            /*
-             * Non-PDF files.
-             */
-
-            // Only some MIME types allowed.
-            if (in_array($mime, $this->app_settings->extra_mime_types) === true) {
-
-                // Save stream to temp file.
-                $temp_path = IL_TEMP_PATH . DIRECTORY_SEPARATOR . $client_name;
-                $file_tools->writeFile($temp_path, $stream);
-
-                // Try to convert the file to PDF. Get converted file path.
-                $converted_path = $this->convertToPdf($temp_path);
-
-                if ($converted_path !== '') {
-
-                    // Success! Save PDF to model.
-                    $fp = \GuzzleHttp\Psr7\Utils::tryFopen($converted_path, 'r');
-                    $pdf_stream = \GuzzleHttp\Psr7\Utils::streamFor($fp);
-
-                    $model = new PdfModel($this->di);
-                    $model->save($item_id, $pdf_stream, $client_name);
-                }
-
-                // Save the original file as a supplement.
-                $stream->rewind();
-                $supplement_model = new SupplementsModel($this->di);
-                $supplement_model->save($item_id, $stream, $client_name);
-
-                // Delete files when done.
-                if (is_writable($temp_path)) {
-
-                    unlink($temp_path);
-                }
-
-                if (is_writable($converted_path)) {
-
-                    unlink($converted_path);
-                }
-
-            } else {
-
-                throw new Exception('uploaded file is not a PDF or a supported type', 400);
-            }
+            // Only PDF files are accepted. Office files and images used to be converted by an office suite, which is no
+            // longer part of the application.
+            throw new Exception('only PDF files can be added', 400);
         }
     }
 

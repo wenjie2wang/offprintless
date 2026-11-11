@@ -126,8 +126,7 @@ class DetailsController extends AppController {
             'pdftohtml',
             'pdftoppm',
             'gs',
-            'tesseract',
-            'soffice'
+            'tesseract'
         ];
 
         foreach ($binaries as $binary) {
@@ -148,7 +147,6 @@ class DetailsController extends AppController {
         /** @var string $pdftoppm */
         /** @var string $gs */
         /** @var string $tesseract */
-        /** @var string $soffice */
 
         $details['binaries'] = [
             'Poppler pdftotext' => $pdftotext,
@@ -156,8 +154,7 @@ class DetailsController extends AppController {
             'Poppler pdftohtml' => $pdftohtml,
             'Poppler pdftoppm'  => $pdftoppm,
             'Ghostscript'       => $gs,
-            'Tesseract OCR (optional)' => $tesseract,
-            'LibreOffice (optional)'   => $soffice
+            'Tesseract OCR (optional)' => $tesseract
         ];
 
         $view = new DetailsView($this->di);

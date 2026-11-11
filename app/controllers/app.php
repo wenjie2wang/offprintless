@@ -106,49 +106,4 @@ abstract class AppController extends Controller {
 
         return $max > 0 && (int) $content_length > $max;
     }
-
-    /**
-     * Convert a file to PDF and return new file pathname.
-     *
-     * @param string $filename
-     * @return string Temporary PDF file path.
-     * @throws Exception
-     */
-    protected function convertToPdf(string $filename): string {
-
-        /** @var Binary $binary */
-        $binary = $this->di->get("Binary");
-
-        // Attempt conversion.
-        if (PHP_OS === 'Linux' || PHP_OS === 'Darwin') {
-
-            putenv('HOME=' . IL_TEMP_PATH);
-        }
-
-        /** @var Queue $queue */
-        $queue = $this->di->getShared('Queue');
-
-        $queue->wait('binary');
-
-        exec($binary->soffice() . ' --invisible --convert-to pdf:writer_pdf_Export --outdir ' .
-            escapeshellarg(IL_TEMP_PATH) . ' ' . escapeshellarg($filename)
-        );
-
-        $queue->release('binary');
-
-        if (PHP_OS === 'Linux' || PHP_OS === 'Darwin') {
-
-            putenv('HOME=""');
-        }
-
-        $new_file = IL_TEMP_PATH . DIRECTORY_SEPARATOR . pathinfo($filename, PATHINFO_FILENAME) . '.pdf';
-
-        if (is_file($new_file) === false) {
-
-            // Conversion failed, exit.
-            return '';
-        }
-
-        return  $new_file;
-    }
 }

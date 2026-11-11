@@ -98,29 +98,8 @@ final class AppSettings {
         'proxy_password'      => '',
         'proxy_auth'          => '',
         'proxy_pac'           => '',
-        'soffice_path'        => '',
         'tesseract_path'      => '',
         'wpad_url'            => ''
-    ];
-
-    public array $extra_file_types = [
-        'doc', 'docx', 'vsd', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'jpg', 'png'
-    ];
-
-    public array $extra_mime_types = [
-        'application/zip', // Office documents are sometimes recognized as this.
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.visio',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'application/vnd.ms-powerpoint',
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        'application/vnd.oasis.opendocument.text',
-        'application/vnd.oasis.opendocument.spreadsheet',
-        'application/vnd.oasis.opendocument.presentation',
-        'image/jpeg',
-        'image/png'
     ];
 
     /**

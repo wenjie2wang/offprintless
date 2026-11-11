@@ -310,7 +310,6 @@ Both fit at once. Phase 0 compares these with a cloud embedding model on real pa
 | `EXTRA_CA_PEM` | PEM text | exists (TLS-inspecting networks) |
 | `CADDY_VERSION` | e.g. `2.10.2` | exists |
 | `WITH_OCR` | `0` / `1` | installs tesseract; off by default, as in the design notes |
-| `WITH_OFFICE` | `0` / `1` | installs LibreOffice for Office import. The current image installs it unconditionally; making it a build option shrinks the default image by several hundred MB |
 | `OP_AI_*` | see above | runtime settings, not build settings |
 
 I would make the app image and the worker the same image, so there is one build to keep current.

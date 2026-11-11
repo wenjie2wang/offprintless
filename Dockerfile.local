@@ -28,7 +28,6 @@ RUN apt update && \
     DEBIAN_FRONTEND=noninteractive TZ=${TIMEZONE} apt install -qy \
     wget tzdata php-fpm php-mbstring php-sqlite3 php-curl php-gd php-xml \
     php-json php-zip php-intl php-ldap ghostscript \
-    libreoffice-calc libreoffice-draw libreoffice-impress libreoffice-math libreoffice-writer \
     poppler-utils tesseract-ocr && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \

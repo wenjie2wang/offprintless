@@ -151,19 +151,12 @@ class ImportController extends AppController {
                 );
             }
 
-            // Office files and images are converted elsewhere; a PDF is checked and filed by the import model.
+            // Only PDF files are accepted.
             $mime_type = mime_content_type($temp_filename);
 
             if ($mime_type !== 'application/pdf') {
 
-                if (in_array($mime_type, $this->app_settings->extra_mime_types) === false) {
-
-                    throw new Exception(sprintf(
-                        $this->lang->t9n('only these file types can be imported: %s'),
-                        join(', ', $this->app_settings->extra_file_types) . ', pdf'), 400);
-                }
-
-                throw new Exception('Office files and images cannot be imported without the converter', 415);
+                throw new Exception('only PDF files can be imported', 400);
             }
 
             $model = new ImportModel($this->di);

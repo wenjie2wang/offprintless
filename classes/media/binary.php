@@ -120,16 +120,6 @@ final class Binary {
     }
 
     /**
-     * @param bool $check
-     * @return string
-     * @throws Exception
-     */
-    public function soffice(bool $check = false): string {
-
-        return $this->command('soffice', $check);
-    }
-
-    /**
      * Return the program name. Optionally check whether it is installed.
      *
      * @param string $binary
@@ -230,21 +220,6 @@ final class Binary {
 
                     return "%PROGRAMFILES%\\Tesseract-OCR\\tesseract.exe";
 
-                }
-
-                return $binary;
-
-            case 'soffice':
-
-                $name = $this->os === 'WINDOWS' ? "$binary.exe" : $binary;
-
-                if ($this->settings->getGlobal('soffice_path') !== '') {
-
-                    return $this->settings->getGlobal('soffice_path') . DIRECTORY_SEPARATOR . $name;
-
-                } elseif($this->os === 'WINDOWS') {
-
-                    return "%PROGRAMFILES%\\LibreOffice\\program\\soffice.exe";
                 }
 
                 return $binary;

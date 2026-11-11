@@ -17,7 +17,6 @@
     * **poppler-utils**: required for PDF indexing and for the built-in PDF viewer.
     * **ghostscript**: required for the built-in PDF viewer.
     * **tesseract-ocr**: optional OCR.
-    * **libreoffice**: optional import of office files.
 
 2. If you are installing from the tar.xz, login as `root` or use `sudo`, and extract files
   into a directory **outside** the web server's root directory (e.g. `/var/www/librarian`). Example:

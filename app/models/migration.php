@@ -38,8 +38,7 @@ class MigrationModel extends AppModel {
         'proxy_name'          => 'proxy_name',
         'proxy_port'          => 'proxy_port',
         'proxy_username'      => 'proxy_username',
-        'proxy_password'      => 'proxy_password',
-        'soffice_path'        => 'soffice_path'
+        'proxy_password'      => 'proxy_password'
     ];
 
     /**

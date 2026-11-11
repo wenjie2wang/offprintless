@@ -46,7 +46,7 @@ Alias /offprintless "C:\Offprintless\public"
   * You may change `C:\Offprintless` to any directory where you want to have *Offprintless*,
     including an external drive.
   * Now you can access your library in a browser at http://127.0.0.1/offprintless
-  * *Optional.* You can install LibreOffice and Tesseract OCR to enable importing Office files and OCR, respectively. 
+  * *Optional.* You can install Tesseract OCR to enable OCR of scanned PDFs. Only PDF files can be imported. 
 
 ### First use
 * Note on security: These installation instructions allow access to your library only from local computer

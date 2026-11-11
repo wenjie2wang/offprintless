@@ -982,7 +982,7 @@ EOT;
 
         $el->addClass('h-100');
         $el->body(<<<EOT
-            <b>Add PDF, office, image file</b><br>
+            <b>Add PDF file</b><br>
             $file_input
             $title
             <div class="mb-3 cursor-pointer" data-toggle="collapse" data-target="#more-metadata">
