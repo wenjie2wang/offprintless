@@ -241,5 +241,16 @@ check('added_time sorts a project (read) without an ambiguous column', $in_proje
 check('added_time sorts a project (search) without an ambiguous column', $in_project('search'), 0);
 check('added_time sorts the project newest-added first', array_values(array_intersect(array_map(fn($i) => (int) $i['id'], $app->model('ItemsModel')->read('project', 'added_time', 100, 0, 'title', 10)['items']), [1, 2, 3])), [1, 3, 2]);
 
+# The dashboard "Items" panel lists the latest items in the same order as the library.
+$panel = fn() => array_map(fn($i) => (int) $i['id'], $app->model('DashboardModel')->get()['last_items']);
+$app->sql("UPDATE items SET added_time = '2031-01-01 00:00:00' WHERE id = 1");
+$app->di->getShared('AppSettings')->setUser(['sorting' => 'added_time']);
+check('dashboard panel starts with the most recently added item (added_time sorting)', $panel()[0], 1);
+$app->di->getShared('AppSettings')->setUser(['sorting' => 'id']);
+check('dashboard panel follows id order for users who chose id sorting', $panel()[0] > 1, true);
+$app->di->getShared('AppSettings')->setUser(['sorting' => 'title']);
+check('dashboard panel uses the added date when the library is sorted by title', $panel()[0], 1);
+$app->di->getShared('AppSettings')->setUser(['sorting' => 'added_time']);
+
 echo $fails === 0 ? "\nALL PASSED\n" : "\n$fails FAILED\n";
 exit($fails === 0 ? 0 : 1);

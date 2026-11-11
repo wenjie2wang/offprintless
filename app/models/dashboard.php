@@ -50,12 +50,16 @@ EOT;
          * Last added.
          */
 
+        // Same order as the library: by the real added date, or by id for users who chose that.
+        // Other library sortings (title, publication date) make no sense for "last added".
+        $last_order = $this->app_settings->getUser('sorting') === 'id' ? 'id DESC' : 'added_time DESC, id DESC';
+
         // Get IDs, remove restricted.
         $sql_items = <<<EOT
 SELECT id
     FROM items
     WHERE id IN ({$visible})
-    ORDER BY id DESC
+    ORDER BY {$last_order}
     LIMIT 5
 EOT;
 
