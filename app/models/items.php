@@ -309,7 +309,7 @@ EOT;
 
                     // Get untagged items.
                     $sqls[] = <<<EOT
-SELECT items.id as item_id, publication_date, title
+SELECT items.id as item_id, publication_date, title, items.added_time AS added_time
     FROM items LEFT JOIN items_tags ON items.id=items_tags.item_id
     WHERE items_tags.item_id IS NULL
 EOT;
@@ -317,7 +317,7 @@ EOT;
                 } else {
 
                     $sqls[] = <<<EOT
-SELECT items.id as item_id, publication_date, title
+SELECT items.id as item_id, publication_date, title, items.added_time AS added_time
     FROM items INNER JOIN items_tags ON items.id=items_tags.item_id
     WHERE items_tags.tag_id=?
 EOT;
@@ -333,7 +333,7 @@ EOT;
             foreach ($filters['author'] as $id) {
 
                 $sqls[] = <<<EOT
-SELECT items.id as item_id, publication_date, title
+SELECT items.id as item_id, publication_date, title, items.added_time AS added_time
     FROM items INNER JOIN items_authors ON items.id=items_authors.item_id
     WHERE items_authors.author_id=?
 EOT;
@@ -348,7 +348,7 @@ EOT;
             foreach ($filters['editor'] as $id) {
 
                 $sqls[] = <<<EOT
-SELECT items.id as item_id, publication_date, title
+SELECT items.id as item_id, publication_date, title, items.added_time AS added_time
     FROM items INNER JOIN items_editors ON items.id=items_editors.item_id
     WHERE items_editors.editor_id=?
 EOT;
@@ -363,7 +363,7 @@ EOT;
             foreach ($filters['keyword'] as $id) {
 
                 $sqls[] = <<<EOT
-SELECT items.id as item_id, publication_date, title
+SELECT items.id as item_id, publication_date, title, items.added_time AS added_time
     FROM items INNER JOIN items_keywords ON items.id=items_keywords.item_id
     WHERE items_keywords.keyword_id=?
 EOT;
@@ -375,7 +375,7 @@ EOT;
         if (!empty($filters['misc']) && in_array('nopdf', $filters['misc'])) {
 
             $sqls[] = <<<EOT
-SELECT id as item_id, publication_date, title
+SELECT id as item_id, publication_date, title, added_time
     FROM items
     WHERE file_hash IS NULL 
 EOT;
@@ -384,7 +384,7 @@ EOT;
         if (!empty($filters['misc']) && in_array('myitems', $filters['misc'])) {
 
             $sqls[] = <<<EOT
-SELECT id as item_id, publication_date, title
+SELECT id as item_id, publication_date, title, added_time
     FROM items
     WHERE added_by = ?
 EOT;
@@ -395,7 +395,7 @@ EOT;
         if (!empty($filters['misc']) && in_array('othersitems', $filters['misc'])) {
 
             $sqls[] = <<<EOT
-SELECT id as item_id, publication_date, title
+SELECT id as item_id, publication_date, title, added_time
     FROM items
     WHERE added_by > ? OR added_by < ?
 EOT;
@@ -455,7 +455,7 @@ EOT;
                 }
 
                 $sqls[] = <<<EOT
-SELECT items.id as item_id, publication_date, title
+SELECT items.id as item_id, publication_date, title, items.added_time AS added_time
     FROM items
     WHERE {$placeholder}
 EOT;
@@ -470,7 +470,7 @@ EOT;
             $sqls = [];
 
             $sqls[] = <<<EOT
-SELECT id as item_id, publication_date, title
+SELECT id as item_id, publication_date, title, added_time
     FROM items
     WHERE id >= ? AND id < ?
 EOT;
@@ -484,7 +484,7 @@ EOT;
         if ($collection === 'clipboard') {
 
             $sqls[] = <<<EOT
-SELECT items.id AS item_id, items.publication_date, items.title
+SELECT items.id AS item_id, items.publication_date, items.title, items.added_time AS added_time
     FROM items INNER JOIN clipboard ON items.id=clipboard.item_id
     WHERE clipboard.user_id = ? AND items.id IN ({$this->visibleItems()})
 EOT;
@@ -509,7 +509,7 @@ EOT;
             $output['project'] = $this->db_main->getResult();
 
             $sqls[] = <<<EOT
-SELECT items.id AS item_id, items.publication_date, items.title
+SELECT items.id AS item_id, items.publication_date, items.title, items.added_time AS added_time
     FROM items INNER JOIN projects_items ON items.id=projects_items.item_id
     WHERE projects_items.project_id = ?
 EOT;
@@ -2569,6 +2569,10 @@ EOT;
     private function orderByColumn(string $orderby): string {
 
         switch ($orderby) {
+
+            case 'added_time':
+                // Qualified: projects and projects_items have an added_time column too.
+                return 'items.added_time DESC';
 
             case 'id':
                 return 'item_id DESC';

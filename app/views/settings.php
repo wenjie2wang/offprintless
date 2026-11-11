@@ -84,10 +84,29 @@ class SettingsView extends TextView {
 
         $el->type('radio');
         $el->inline(true);
+        $el->id('sorting_added_time');
+        $el->name('settings[sorting]');
+        $el->value('added_time');
+        $el->label($this->lang->t9n('added date'));
+
+        if ($user_settings['sorting'] === 'added_time') {
+
+            $el->checked('checked');
+        }
+
+        $radios_l .= $el->render();
+
+        $el = null;
+
+        /** @var Bootstrap\Input $el */
+        $el = $this->di->get('Input');
+
+        $el->type('radio');
+        $el->inline(true);
         $el->id('sorting_id');
         $el->name('settings[sorting]');
         $el->value('id');
-        $el->label($this->lang->t9n('added date'));
+        $el->label($this->lang->t9n('newest first (by id)'));
 
         if ($user_settings['sorting'] === 'id') {
 
@@ -1192,10 +1211,29 @@ EOT;
 
         $el->type('radio');
         $el->inline(true);
+        $el->id('sorting_added_time');
+        $el->name('settings[sorting]');
+        $el->value('added_time');
+        $el->label($this->lang->t9n('added date'));
+
+        if ($user_settings['sorting'] === 'added_time') {
+
+            $el->checked('checked');
+        }
+
+        $output .= $el->render();
+
+        $el = null;
+
+        /** @var Bootstrap\Input $el */
+        $el = $this->di->get('Input');
+
+        $el->type('radio');
+        $el->inline(true);
         $el->id('sorting_id');
         $el->name('settings[sorting]');
         $el->value('id');
-        $el->label($this->lang->t9n('added date'));
+        $el->label($this->lang->t9n('newest first (by id)'));
 
         if ($user_settings['sorting'] === 'id') {
 

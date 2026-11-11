@@ -204,5 +204,42 @@ check('uid search: a part of a uid does not match', $one('10.1000/ab', 'uid'), [
 echo "=== The same search twice gives the same answer ===\n";
 check('repeatable', $one('regression'), $one('regression'));
 
+echo "=== Ordering by added date (added_time), most recently added first ===\n";
+# Items were inserted across the test, so several item ids exist and most keep
+# their real added_time (now, at test run). Give ids 1, 2 and 3 distinct, explicit
+# added_time values in 2020 (older than any real one) chosen so added_time DESC is
+# NOT the same order as id DESC:
+#   id 1 -> 2020-01-03 (newest), id 2 -> 2020-01-01 (oldest), id 3 -> 2020-01-02.
+# So added_time DESC is [1, 3, 2]; id DESC is [3, 2, 1]. Asserting the relative
+# order of just these three proves the ordering reads added_time, not the id, and
+# does not depend on how many other items the earlier sections created.
+$app->sql("UPDATE items SET added_time = '2020-01-03 00:00:00' WHERE id = 1");
+$app->sql("UPDATE items SET added_time = '2020-01-01 00:00:00' WHERE id = 2");
+$app->sql("UPDATE items SET added_time = '2020-01-02 00:00:00' WHERE id = 3");
+$ids_in_order = function (string $orderby) use ($app): array {
+    $r = $app->model('ItemsModel')->read('library', $orderby, 1000, 0, 'title');
+    return array_map(fn($i) => (int) $i['id'], $r['items'] ?? []);
+};
+$by_added = $ids_in_order('added_time');
+$by_id = $ids_in_order('id');
+$rel_added = array_values(array_intersect($by_added, [1, 2, 3]));
+$rel_id = array_values(array_intersect($by_id, [1, 2, 3]));
+check('added_time puts id 1, then 3, then 2 (newest timestamp first)', $rel_added, [1, 3, 2]);
+check('id ordering puts 3, then 2, then 1 (newest id first)', $rel_id, [3, 2, 1]);
+check('added_time and id give different orders for these three', $rel_added === $rel_id, false);
+check('an unknown sorting type is rejected', code(fn() => $ids_in_order('no_such_sort')), 500);
+# The sidebar filters build a compound (INTERSECT) query whose ORDER BY must name a selected column.
+$filtered = fn(string $c, ?int $p) => code(fn() => $app->model('ItemsModel')->readFiltered(['tag' => [1]], $c, 'added_time', 10, 0, 'title', $p));
+check('added_time sorts filtered library', $filtered('library', null), 0);
+check('added_time sorts filtered project', $filtered('project', 10), 0);
+check('added_time sorts filtered clipboard', $filtered('clipboard', null), 0);
+$app->sql("INSERT OR IGNORE INTO projects_items (project_id,item_id) VALUES (10,1),(10,2),(10,3)");
+$in_project = fn(string $m) => code(fn() => $m === 'read'
+    ? $app->model('ItemsModel')->read('project', 'added_time', 10, 0, 'title', 10)
+    : $app->model('ItemsModel')->search($S([['regression', 'TI', 'AND']]), 'project', 'added_time', 10, 0, 'title', 10));
+check('added_time sorts a project (read) without an ambiguous column', $in_project('read'), 0);
+check('added_time sorts a project (search) without an ambiguous column', $in_project('search'), 0);
+check('added_time sorts the project newest-added first', array_values(array_intersect(array_map(fn($i) => (int) $i['id'], $app->model('ItemsModel')->read('project', 'added_time', 100, 0, 'title', 10)['items']), [1, 2, 3])), [1, 3, 2]);
+
 echo $fails === 0 ? "\nALL PASSED\n" : "\n$fails FAILED\n";
 exit($fails === 0 ? 0 : 1);

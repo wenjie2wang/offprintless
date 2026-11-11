@@ -48,7 +48,7 @@ final class AppSettings {
         'icons_per_row'    => 'auto',
         'page_size'        => '10',
         'pdf_viewer'       => 'internal',
-        'sorting'          => 'id',
+        'sorting'          => 'added_time',
         'theme'            => 'light',
         'timezone'         => 'UTC',
         'use_en_language'  => '0'
