@@ -20,12 +20,12 @@ services:
       dockerfile: Dockerfile.local
       args:
         TIMEZONE: ${TIMEZONE:-Etc/UTC}
-    image: offprintless:latest
+    image: ${IMAGE_TAG:-offprintless:latest}
     container_name: offprintless
     ports:
       - "${PORT:-8080}:80"
     volumes:
-      - ./data:/i-librarian/data                 # your data folder: database/, pdfs/, supplements/ ...
+      - ${DATA_DIR:-./data}:/i-librarian/data     # your data folder: database/, pdfs/, supplements/ ...
       - /etc/localtime:/etc/localtime:ro
       - ./config:/i-librarian/config:ro          # optional ilibrarian.ini (LDAP, cookie_secure)
     environment:

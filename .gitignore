@@ -17,5 +17,8 @@ package.sh
 tests/.tracked
 ## Project-local only, never commit
 CLAUDE.md
+## Local Docker overrides (server-specific paths, ports, networks)
+.env
+docker-compose.override.yml
 ## macOS sed -i -E backup artifacts
 app/views/*-E
