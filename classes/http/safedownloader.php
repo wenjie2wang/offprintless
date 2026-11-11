@@ -39,7 +39,7 @@ final class SafeDownloader {
     public function __construct(ClientInterface $client, Closure $resolver = null, int $max_bytes = 100000000, int $max_redirects = 5) {
 
         $this->client = $client;
-        $this->resolver = $resolver ?? [self::class, 'resolve'];
+        $this->resolver = $resolver ?? Closure::fromCallable([self::class, 'resolve']);
         $this->max_bytes = $max_bytes;
         $this->max_redirects = $max_redirects;
     }

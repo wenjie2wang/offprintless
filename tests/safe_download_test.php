@@ -90,5 +90,9 @@ $opts = \Librarian\Http\SafeDownloader::requestOptions('pub.example', '93.184.21
 check('curl is told to resolve the host to the checked IP', in_array('pub.example:443:93.184.216.34', $opts['curl'][CURLOPT_RESOLVE] ?? [], true), true);
 check('redirects are handled by us, not followed silently by curl', $opts['allow_redirects'], false);
 
+echo "--- the default resolver (what the factory uses) ---\n";
+check('a downloader built without a resolver can be created', $threw(fn() => new \Librarian\Http\SafeDownloader(new Client(['handler' => HandlerStack::create(new MockHandler([]))]))), false);
+check('the factory builds one', $threw(fn() => $app->di->get('SafeDownloader')), false);
+
 echo $fails === 0 ? "\nALL PASSED\n" : "\n$fails FAILED\n";
 exit($fails === 0 ? 0 : 1);
