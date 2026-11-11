@@ -1554,7 +1554,8 @@ SQL;
 
         $pdf_object = new PdfModel($this->di);
 
-        $result = ['count' => 0, 'linked' => 0, 'skipped' => [], 'failed' => [], 'duplicates' => [], 'pdf_missing' => []];
+        $result = ['count' => 0, 'linked' => 0, 'skipped' => [], 'failed' => [], 'duplicates' => [], 'pdf_missing' => [], 'key_updated' => 0, 'pdf_attached' => 0];
+        $adopt = !empty($data['adopt']);
         $this->dedupe_index = [];
 
         while (($entry = $this->parser->getEntry()) !== null) {
@@ -1570,6 +1571,13 @@ SQL;
                 $key = $entry[ItemMeta::COLUMN['BIBTEX_ID']] ?? null;
                 $title = $entry[ItemMeta::COLUMN['TITLE']] ?? '';
                 $outcome = $this->linkExistingItem($existing, $data);
+
+                if ($adopt) {
+
+                    $adopted = $this->adoptImportedKey($existing, $entry);
+                    $result['key_updated'] += $adopted['key_updated'];
+                    $result['pdf_attached'] += $adopted['pdf_attached'];
+                }
 
                 if ($outcome['present'] > 0 || $outcome['linked'] === 0) {
 
@@ -1847,6 +1855,74 @@ SQL;
 
         $key = $this->normalizeText((string) ($entry[$C['TITLE']] ?? '')) . '|' . $this->normalizeText((string) (($entry[$C['AUTHOR_LAST_NAME']] ?? [])[0] ?? ''));
         $this->dedupe_index[$year][$key][] = $item_id;
+    }
+
+    /**
+     * An imported entry is an article the library already holds. Take over the key it carries and give the item the
+     * PDF it lacks. Everything else about the item is left as it is.
+     *
+     * The key is changed only when the entry has one, nobody else uses it, and the user may edit the item. The PDF is
+     * attached only when the item has none and the file resolves inside the import folder.
+     *
+     * @param int $item_id
+     * @param array $entry
+     * @return array ['key_updated' => 0|1, 'pdf_attached' => 0|1]
+     * @throws Exception
+     */
+    private function adoptImportedKey(int $item_id, array $entry): array {
+
+        $out = ['key_updated' => 0, 'pdf_attached' => 0];
+
+        // The same permission as for editing the item by hand.
+        $this->requireItemRole($item_id, 'editor');
+
+        $key = trim((string) ($entry[ItemMeta::COLUMN['BIBTEX_ID']] ?? ''));
+
+        if ($key !== '') {
+
+            $this->db_main->run('SELECT bibtex_id FROM items WHERE id = ?', [$item_id]);
+            $current = (string) $this->db_main->getResult();
+
+            $this->db_main->run('SELECT count(*) FROM items WHERE bibtex_id = ? AND id <> ?', [$key, $item_id]);
+            $taken = (int) $this->db_main->getResult() > 0;
+
+            if ($current !== $key && $taken === false) {
+
+                $this->db_main->run(
+                    'UPDATE items SET bibtex_id = ?, changed_by = ?, changed_time = CURRENT_TIMESTAMP WHERE id = ?',
+                    [$key, $this->user_id, $item_id]
+                );
+                $out['key_updated'] = 1;
+            }
+        }
+
+        if (!empty($entry['PDF']) && $this->isPdf($item_id) === false) {
+
+            $pdf_file = $this->importFilePath((string) $entry['PDF']);
+
+            if ($pdf_file !== null && is_readable($pdf_file)) {
+
+                try {
+
+                    $pdf_object = new PdfModel($this->di);
+                    $fp = fopen($pdf_file, 'rb');
+                    $pdf_object->save($item_id, \GuzzleHttp\Psr7\Utils::streamFor($fp));
+                    $out['pdf_attached'] = 1;
+
+                    // Delete the file when done, as for a new item.
+                    if (is_writable($pdf_file)) {
+
+                        unlink($pdf_file);
+                    }
+
+                } catch (Exception $exc) {
+
+                    // Not a usable PDF: the key change above still stands.
+                }
+            }
+        }
+
+        return $out;
     }
 
     /**

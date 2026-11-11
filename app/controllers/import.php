@@ -327,6 +327,16 @@ class ImportController extends AppController {
                 $notes[] = count($result['failed']) . ' could not be saved';
             }
 
+            if ((int) $result['key_updated'] > 0) {
+
+                $notes[] = (int) $result['key_updated'] . ' BibTeX keys updated';
+            }
+
+            if ((int) $result['pdf_attached'] > 0) {
+
+                $notes[] = (int) $result['pdf_attached'] . ' PDFs added to items that had none';
+            }
+
             if ((int) $result['linked'] > 0) {
 
                 $notes[] = (int) $result['linked'] . ' already in the library and added to this project';
@@ -342,7 +352,11 @@ class ImportController extends AppController {
                 $notes[] = count($result['pdf_missing']) . ' linked PDFs not found in the import folder';
             }
 
-            if ($count === 0 && $notes !== []) {
+            if ($count === 0 && ((int) $result['key_updated'] > 0 || (int) $result['pdf_attached'] > 0)) {
+
+                $info = 'no new items; ' . join(', ', $notes);
+
+            } elseif ($count === 0 && $notes !== []) {
 
                 $info = 'nothing new was saved: ' . join(', ', $notes);
 

@@ -10,7 +10,7 @@ printf '%-22s' weekly_backup
 out=$(sh tests/weekly_backup_test.sh 2>&1)
 echo "$out" | grep -E "ALL PASSED|FAILED" || { echo "(no result)"; fail=1; }
 echo "$out" | grep -q "ALL PASSED" || fail=1
-for t in theme_choice backup_db repo_hygiene pdf_only semantic brand theme ai_split old_session api_key_env ai_consent ai_foundation ai_openai chat notebook search search_index_upgrade frontend_sync import_reliability import_upload item_refcount import_dedupe import_text bibtex_ris upload_limit import_security safe_download logs_retention hardening connectors logs project_notes fix_round project_access item_access project_roles member_roles own_item facet_leak privacy; do
+for t in theme_choice backup_db repo_hygiene pdf_only semantic brand theme ai_split old_session api_key_env ai_consent ai_foundation ai_openai chat notebook search search_index_upgrade frontend_sync import_reliability import_upload item_refcount import_dedupe import_adopt_key import_text bibtex_ris upload_limit import_security safe_download logs_retention hardening connectors logs project_notes fix_round project_access item_access project_roles member_roles own_item facet_leak privacy; do
   printf '%-22s' "$t"
   out=$(podman run --rm -v "$PWD":/w -w /w il-phptest php tests/${t}_test.php 2>&1)
   echo "$out" | grep -E "ALL PASSED|FAILED" || { echo "(no result)"; fail=1; }

@@ -1521,6 +1521,19 @@ BODY
 
 HELP;
 
+        /** @var Bootstrap\Input $el */
+        $el = $this->di->get('Input');
+
+        $el->id('adopt-checkbox');
+        $el->groupClass('mt-3 mb-0');
+        $el->type('checkbox');
+        $el->label($this->lang->t9n('For articles already in the library: take over the BibTeX key and add the PDF if it has none'));
+        $el->name('adopt');
+        $el->value('1');
+        $adopt_check = $el->render();
+
+        $el = null;
+
         /** @var Bootstrap\Card $el */
         $el = $this->di->get('Card');
 
@@ -1528,6 +1541,7 @@ HELP;
             $ta
             <p>&mdash;{$this->lang->t9n('OR')}&mdash;</p>
             $file_input
+            $adopt_check
             <div class="mt-3">
                 <div class="mb-3 cursor-pointer" data-toggle="collapse" data-target="#collections">
                     {$chevron}{$this->lang->t9n('Add to')}
