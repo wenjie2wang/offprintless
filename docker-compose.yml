@@ -1,38 +1,33 @@
-# For the server "tars" (x86_64, Docker Compose v2+). Uses the EXISTING data in place.
+# Example Docker Compose file for Offprintless.
 #
-#   Build the image from this checkout (branch ww-project-access), then:
+#   Build the image from this checkout, then:
 #     docker compose build
 #     docker compose up -d
 #
-# The data folder is the one that already holds database/, pdfs/, supplements/ ...
-# It is mounted as-is, so the existing library is used directly (no copy, no import).
+# The data folder holds database/, pdfs/, supplements/ ... Mount it as-is so an
+# existing library is used directly (no copy, no import). Point the data volume
+# below at your data folder (the one that already holds the library, or a new
+# empty one).
 #
-# BACK UP FIRST. The new version upgrades the database schema on first start and
-# the old 5.11.x image cannot necessarily read it afterwards:
-#     docker stop i-librarian        # the old container (this one is named offprintless)
-#     sudo cp -a /media/docker-services/i-librarian/database /media/docker-services/i-librarian/database.bak-$(date +%F)
+# BACK UP FIRST. The app upgrades the database schema on first start, and the
+# old 5.11.x image cannot necessarily read it afterwards. If you are replacing an
+# existing "i-librarian" container, stop and remove it first (this one is named
+# offprintless), and back up your data folder before the first start.
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile.local
       args:
-        TIMEZONE: America/New_York
-    image: offprintless:project-access
-    container_name: offprintless         # the old container is named i-librarian: stop and remove it first
+        TIMEZONE: ${TIMEZONE:-Etc/UTC}
+    image: offprintless:latest
+    container_name: offprintless
     ports:
-      - "8185:80"                        # same host port as before; the cloudflare tunnel keeps working
+      - "${PORT:-8080}:80"
     volumes:
-      - /media/docker-services/i-librarian:/i-librarian/data   # existing data, used in place
+      - ./data:/i-librarian/data                 # your data folder: database/, pdfs/, supplements/ ...
       - /etc/localtime:/etc/localtime:ro
-      - ./config:/i-librarian/config:ro                        # optional ilibrarian.ini (LDAP, cookie_secure)
+      - ./config:/i-librarian/config:ro          # optional ilibrarian.ini (LDAP, cookie_secure)
     environment:
-      - TZ=America/New_York
-    networks:
-      - cloudflare-tunnel
+      - TZ=${TZ:-Etc/UTC}
     restart: unless-stopped
-
-networks:
-  cloudflare-tunnel:
-    name: cloudflare-tunnel
-    external: true

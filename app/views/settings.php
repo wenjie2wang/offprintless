@@ -1152,7 +1152,7 @@ EOT;
             . $row('ai-chat-model', 'ai_chat_model', 'Chat model')
             . '<div class="mt-3"><b>' . $t('Embeddings') . '</b></div>'
             . '<div class="text-muted small mb-1">' . $t('Used to find the right passages. Leave the address empty to use the chat service. Anthropic has no embeddings, so give another service here, for example a local Ollama.') . '</div>'
-            . $row('ai-embed-base-url', 'ai_embed_base_url', 'Service address (if different)', 'e.g. http://172.19.0.1:11434/v1')
+            . $row('ai-embed-base-url', 'ai_embed_base_url', 'Service address (if different)', 'e.g. http://host.docker.internal:11434/v1 for a local Ollama')
             . $row('ai-embed-api-key', 'api_ai_embed', 'API key (if different)', 'Used only for the address above. Also OFFPRINTLESS_API_AI_EMBED. The chat key is never sent to this service.', 'password')
             . $row('ai-embed-model', 'ai_embed_model', 'Embedding model')
             . $row('ai-embed-query-prefix', 'ai_embed_query_prefix', 'Prefix for a question (optional)', 'Some models need it, e.g. "search_query: " for nomic-embed-text. Leave empty if unsure. Changing it rebuilds the search index.')

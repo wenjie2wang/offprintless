@@ -1,6 +1,6 @@
 # Semantic search and AI plug-ins: plan
 
-Status: proposal. Nothing here is implemented. Section 9 records the decisions made on 2026-11-10 and the few that remain.
+Status: the AI features below are built. This document records the design decisions and measurements behind them.
 
 ## 1. Goals and non-goals
 
@@ -22,12 +22,12 @@ Non-goals
 
 | Finding | Source | Consequence |
 |---|---|---|
-| The production library has 1,489 items. None has an abstract or a keyword. 1,482 have PDF text. | read-only query on `tars` | A "paper vector" cannot come from the abstract. It is built from the title plus the first part of the PDF text. |
+| The measured production library has a few thousand items, none with an abstract or a keyword, and nearly all with PDF text. | read-only query on the production database | A "paper vector" cannot come from the abstract. It is built from the title plus the first part of the PDF text. |
 | The PDF text is about 90 MB, roughly 23 million tokens (about 63,000 characters per paper, longest 1.4 million). | same | Embedding every chunk of every paper is possible but is a large job. Papers are embedded first. |
 | PHP 8.1 PDO cannot load SQLite extensions (`loadExtension` arrives in PHP 8.4). | image | `sqlite-vec` is not usable from this app without a second SQLite connection. Vectors are compared in PHP. |
 | Comparing a query with stored float32 vectors in plain PHP: 22 ms for 1,500 x 768, 288 ms for 20,000 x 768, 1.3 s for 90,000 x 384. | measured in the image | Paper-level search is instant. Whole-library chunk search is about 1.3 s at 384 dimensions and roughly double at 768 (extrapolated). |
 | There is no cron or worker process in the image. PHP request time is 300 s. | `start.local.sh` | Embedding needs a background worker, started by the container script. |
-| `tars` has 28 cores and 64 GB of memory. Whether it has a GPU is not known. | `nproc`, `free` | Local embedding is plausible. Its speed is not measured and is the first thing to benchmark. |
+| A typical host has enough cores and memory for local embedding. Whether it has a GPU is not known. | `nproc`, `free` | Local embedding is plausible. Its speed is not measured and is the first thing to benchmark. |
 | `pdftotext` output keeps form feeds between pages, and the app already stores it. | `PdfModel::_save` | Chunks can carry page numbers cheaply, so chat citations can say "p. 7". |
 | API keys are kept in the `settings` table as plain text. The `OFFPRINTLESS_API_*` environment variables (the old `IL_API_*` still work) override them. | `AppSettings::apiKey` | AI keys must come from the environment or be masked and never logged. |
 
@@ -83,8 +83,8 @@ Vectors are keyed by `model_id`. Changing the model re-embeds in the background 
 
 ### 3.3 Indexing
 
-- **Paper vector**: title, then the first 2,000 characters of the PDF text (usually the abstract). One per item. 1,489 items is about 3 million characters, so this is cheap on any provider.
-- **Passage vectors** are made only when a paper is searched or chatted with (section 12), never for the whole library in advance: about 1,000 characters on sentence boundaries with 150 overlap, each tagged with its page. A library-wide passage index (about 94,000 passages for the production library) is not planned.
+- **Paper vector**: title, then the first 2,000 characters of the PDF text (usually the abstract). One per item. A few thousand items is a few million characters, so this is cheap on any provider.
+- **Passage vectors** are made only when a paper is searched or chatted with (section 12), never for the whole library in advance: about 1,000 characters on sentence boundaries with 150 overlap, each tagged with its page. A library-wide passage index is not planned.
 - The text comes from the stored PDF text, not from `full_text_index` (which is lower-cased and stripped of accents and punctuation).
 - A worker process (`php bin/worker.php`, started by the container script next to php-fpm and Caddy) takes jobs, calls the provider through the existing queue lanes for rate limiting, retries with back-off, and records errors. A job is enqueued when an item is created, edited or has its PDF replaced.
 
@@ -222,8 +222,8 @@ Made on 2026-11-10
 
 | # | Question | Decision |
 |---|---|---|
-| 1 | Where embeddings run | From an API, behind the provider interface (cloud first; any OpenAI-compatible server works too, including a local one). Text may leave `tars` once the user has allowed it with the per-user switch and acknowledged the notice. |
-| 2 | Hardware and model servers | `tars` has an RTX 4070 (12 GB) and already runs a host-level Ollama and Open WebUI. **No model server is shipped with or inside the app image or its compose file.** The app only calls an API that the administrator points it at (section 10). |
+| 1 | Where embeddings run | From an API, behind the provider interface (cloud first; any OpenAI-compatible server works too, including a local one). Text may leave the server once the user has allowed it with the per-user switch and acknowledged the notice. |
+| 2 | Hardware and model servers | The host may run a local Ollama and Open WebUI. **No model server is shipped with or inside the app image or its compose file.** The app only calls an API that the administrator points it at (section 10). |
 | 3 | Language | English only for now. An English embedding model is enough. Multilingual support is a later switch of model, not a redesign. |
 | 5 | Granularity | Paper-level search first. After a paper is opened, a person can search inside that paper (section 3.6). Library-wide passage search is left out. |
 | 6 | Plug-in runtime | Separate services over signed HTTP are the main route. In-app PHP plug-ins are only for small trusted adapters. |
@@ -236,12 +236,12 @@ Decision 4 (PDF text and outside services) is settled in section 11.
 
 Neither the app image nor `docker-compose.yml` includes Ollama, a model, or a GPU reservation. This keeps the image small and leaves the choice, the hardware and the model files to the administrator. The only AI-related thing the repository adds to Docker is the indexing worker (section 10.3), which is the same image as the app.
 
-### 10.2 What `tars` already has (read-only check)
+### 10.2 What a host may already run (checked, not assumed)
 
-- GPU: NVIDIA RTX 4070, 12 GB, driver 615.78.
-- A **host-level Ollama 0.40.15** (system service, `OLLAMA_HOST=0.0.0.0:11434`) with `qwen3:14b` and `qwen2.5-coder:14b`.
-- **Open WebUI 0.10.2** (the `cuda` image) on port 3000. It requires an API key (an unauthenticated call returns 401).
-- I could not confirm from outside which API paths Open WebUI offers (its `/openapi.json` returned a web page, not a specification). The paths it is documented to offer, and whether it offers embeddings at all, are checked in Phase 0 by the app's "Test connection" (section 10.4), not assumed.
+- An optional GPU and driver, if the host has one.
+- A **host-level Ollama** (system service, `OLLAMA_HOST=0.0.0.0:11434`) with one or more chat models.
+- **Open WebUI** on port 3000, if used as a gateway. It requires an API key (an unauthenticated call returns 401).
+- The API paths Open WebUI offers, and whether it offers embeddings at all, are checked by the app's "Test connection" (section 10.4), not assumed.
 
 ### 10.3 What the app needs to be told
 
@@ -268,10 +268,10 @@ services:
 
 The model servers themselves are entered on the administrator's AI page (or as environment variables, which win), once for each of two roles:
 
-| Role | Settings | Example on `tars` |
+| Role | Settings | Example |
 |---|---|---|
 | Embeddings | base URL, API key, model name | Ollama at `http://host.docker.internal:11434`, `nomic-embed-text` |
-| Chat | base URL, API key, model name | Open WebUI at `http://host.docker.internal:3000/api`, `qwen3:14b`; or Ollama directly |
+| Chat | base URL, API key, model name | Open WebUI at `http://host.docker.internal:3000/api`, a chat model; or Ollama directly |
 
 They are separate on purpose. Embeddings can use Ollama directly (small, fast) while chat goes through Open WebUI, and either may be a cloud service. Keys are never shown after saving, and the `OFFPRINTLESS_API_*` style environment variables override stored ones.
 
@@ -290,15 +290,15 @@ For each role it checks, and reports in plain language: the address is reachable
 ### 10.5 Networking and safety
 
 - The model server address is administrator configuration. It may be a private address; that is the one place the app is allowed to call one, and the guarded downloader that user URLs go through must not be used for it.
-- The existing host Ollama listens on every interface. That is how a container can reach it, but it also means any machine that can reach `tars` on port 11434 can use the GPU. The containers on `tars` use the bridge (`172.17.0.1`) and the `cloudflare-tunnel` network (`172.19.0.1`). The host firewall should allow 11434 only from the Docker networks and the local network. I could not read the firewall (it needs sudo), so this is for you to check.
-- Models are not baked into any image. They live wherever the model server keeps them (on `tars`, `/var/lib/ollama`).
+- A host Ollama that listens on every interface can be reached by a container, but also by any machine that can reach the host on port 11434. The host firewall should allow 11434 only from the Docker networks and the local network.
+- Models are not baked into any image. They live wherever the model server keeps them (for Ollama, typically `/var/lib/ollama`).
 
 ### 10.6 Models that fit a 12 GB card
 
 | Job | Suggested model (English) | Memory |
 |---|---|---|
 | Embeddings | `nomic-embed-text` (768 dimensions) or `mxbai-embed-large` (1024) | under 1 GB |
-| Chat | `qwen3:14b` (already on `tars`) | about 9 GB, leaving room for the embedder |
+| Chat | a 14B chat model such as `qwen3:14b` | about 9 GB, leaving room for the embedder |
 
 Both fit at once. Phase 0 compares these with a cloud embedding model on real papers before one is chosen. A chat model and an embedding model loaded together can be evicted by Open WebUI if it loads a large model, so the app must handle "model not loaded yet" with a retry and a clear message.
 
@@ -312,7 +312,7 @@ Both fit at once. Phase 0 compares these with a cloud embedding model on real pa
 | `WITH_OCR` | `0` / `1` | installs tesseract; off by default, as in the design notes |
 | `OP_AI_*` | see above | runtime settings, not build settings |
 
-I would make the app image and the worker the same image, so there is one build to keep current.
+The app image and the worker are the same image, so there is one build to keep current.
 
 ### 10.8 Chat and embeddings on different services (built)
 
@@ -330,7 +330,7 @@ Query and document prefixes (`ai_embed_query_prefix`, `ai_embed_doc_prefix`) are
 
 ## 11. Decision 4: PDF text and outside services (settled)
 
-Decided: embeddings come from an API, and text may leave `tars` once a user has allowed it through the per-user switch.
+Decided: embeddings come from an API, and text may leave the server once a user has allowed it through the per-user switch.
 
 What is sent. For semantic search, the paper's title and the opening of its text (about 2,000 characters). For chat, the passages that answer the question.
 
@@ -356,4 +356,4 @@ After a paper is opened, the page gets a search box for that paper only.
 - Access is the same as for opening the paper: someone who cannot see the item cannot search inside it, and the passages are never returned in library-wide results.
 - A paper that has no text (a scan) says so, and offers OCR if it is installed.
 
-Library-wide search by passage (about 94,000 passages for the current library) is therefore not built. It can be added later without changing anything above, because the passages are stored the same way.
+Library-wide search by passage is therefore not built. It can be added later without changing anything above, because the passages are stored the same way.
