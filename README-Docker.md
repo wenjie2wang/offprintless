@@ -13,15 +13,19 @@ the directory permissions to 0777 instead.
 
 ```bash
 mkdir -p /var/www/offprintless/library/config
-tar xf I-Librarian-5.11.3-Linux.tar.xz config/ilibrarian-default.ini --strip-components=1
-mv ilibrarian-default.ini /var/www/offprintless/library/config/ilibrarian.ini
+cp config/ilibrarian-default.ini /var/www/offprintless/library/config/ilibrarian.ini
 ```
 
 ## Build an image
 
+From a checkout of this repository:
+
 ```bash
-docker build -t offprintless:5.11.3 - < I-Librarian-5.11.3-Linux.tar.xz
+docker build -t offprintless:5.11.3 -f Dockerfile.local .
 ```
+
+(`Dockerfile.local` also builds on ARM, for example an Apple Silicon Mac. The plain `Dockerfile` is the original's
+x86-64 version and can also be fed a release tarball as `docker build -t offprintless:5.11.3 - < package.tar.xz`.)
 
 ## Run container
 

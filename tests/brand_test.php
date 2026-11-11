@@ -64,5 +64,20 @@ check('no stray editor or sed backup files are tracked', trim((string) shell_exe
 check('the README no longer tells people to install into an I, Librarian folder', !str_contains((string) file_get_contents("$root/README.md"), 'C:\\I, Librarian'));
 check('the home crumb is a translated label', substr_count((string) file_get_contents("$root/app/views/dashboard.php"), "t9n('Home')") >= 1);
 
+echo "--- the README credits the project it was forked from ---\n";
+$readme = (string) file_get_contents($root . '/README.md');
+check('it says plainly that this is a fork of I, Librarian Free', preg_match('~is a fork of \*{0,2}\[I, Librarian Free\]\(https://github\.com/mkucej/i-librarian-free\)~i', $readme) === 1);
+check('it links to the original repository', str_contains($readme, 'https://github.com/mkucej/i-librarian-free'));
+check('it names the original author', str_contains($readme, 'Martin Kucej'));
+check('it names the licence and says the fork keeps it', str_contains($readme, 'GNU GPL v3') || str_contains($readme, 'GPL-3.0'));
+check('it says it is not endorsed by the original project', stripos($readme, 'not affiliated') !== false || stripos($readme, 'not endorsed') !== false);
+check('it has a section on what is new', preg_match('/^## What is new/mi', $readme) === 1);
+check('it has a credits section', preg_match('/^## Credits/mi', $readme) === 1);
+check('it does not send people to the upstream installers', !str_contains($readme, 'mkucej/i-librarian-free/releases'));
+check('it has no em-dashes', !str_contains($readme, "\u{2014}"));
+foreach (['project', 'Scopus', 'meaning', 'backup', 'PDF'] as $word) {
+    check("the summary mentions $word", stripos($readme, $word) !== false);
+}
+
 echo $fails === 0 ? "\nALL PASSED\n" : "\n$fails FAILED\n";
 exit($fails === 0 ? 0 : 1);
