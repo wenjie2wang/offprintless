@@ -68,7 +68,7 @@ HTML
             $el = $this->di->get('Breadcrumb');
 
             $el->style('margin: 0 -15px');
-            $el->item('IL', IL_BASE_URL);
+            $el->item($this->lang->t9n('Home'), IL_BASE_URL);
             $el->item($this->lang->t9n('Create account'));
             $bc = $el->render();
 

@@ -88,7 +88,7 @@ final class Xplore extends ExternalDatabase implements ExternalDatabaseInterface
      *
      * @param array $terms Search terms [name => term].
      * @param int $start Starting record for this page.
-     * @param int $rows Optional number of records per I, Librarian page.
+     * @param int $rows Optional number of records per page of results.
      * @param array|null $filters Optional array of filters [name => value].
      * @param string|null $sort Optional sorting string.
      * @return array
@@ -130,7 +130,7 @@ final class Xplore extends ExternalDatabase implements ExternalDatabaseInterface
             }
         }
 
-        // Total rows to fetch per search. This does not equal the I, Librarian page size.
+        // Total rows to fetch per search. This does not equal the page size shown.
         $maximum_rows = 100;
         $sdk_start = floor($start / $maximum_rows) * $maximum_rows;
 

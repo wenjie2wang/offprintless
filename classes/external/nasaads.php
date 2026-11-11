@@ -208,7 +208,7 @@ class Nasaads extends ExternalDatabase implements ExternalDatabaseInterface {
 
         $params = [
             'q'     => $query,
-            // Total rows to fetch per search. This does not equal I, Librarian page size.
+            // Total rows to fetch per search. This does not equal the page size shown.
             'start' => floor($start / $maximum_rows) * $maximum_rows,
             'fq'    => $filters,
             'rows'  => $maximum_rows,

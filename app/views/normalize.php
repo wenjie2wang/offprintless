@@ -25,7 +25,7 @@ class NormalizeView extends TextView {
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', '#dashboard');
+        $el->item($this->lang->t9n('Home'), '#dashboard');
         $el->item($this->lang->t9n('Normalize data'));
         $bc = $el->render();
 
@@ -150,7 +150,7 @@ LINKS
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', '#dashboard');
+        $el->item($this->lang->t9n('Home'), '#dashboard');
         $el->item($this->lang->t9n('Normalize data'), '#normalize/main');
         $el->item($title);
         $bc = $el->render();

@@ -113,7 +113,7 @@ final class Crossref extends ExternalDatabase implements ExternalDatabaseInterfa
      *
      * @param array $terms Search terms [[name => term]].
      * @param int $start Starting record for this page.
-     * @param int $rows Optional number of records per I, Librarian page.
+     * @param int $rows Optional number of records per page of results.
      * @param array|null $filters Optional array of filters [[name => value]].
      * @param string|null $sort Optional sorting string.
      * @return array
@@ -200,7 +200,7 @@ final class Crossref extends ExternalDatabase implements ExternalDatabaseInterfa
                 break;
         }
 
-        // Total rows to fetch per search. This does not equal the I, Librarian page size.
+        // Total rows to fetch per search. This does not equal the page size shown.
         $params['offset'] = floor($start / $maximum_rows) * $maximum_rows;
 
         // Try to get records from Cache.

@@ -33,7 +33,7 @@ class ImportView extends TextView {
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', '#dashboard');
+        $el->item($this->lang->t9n('Home'), '#dashboard');
         $el->item($this->lang->t9n('Import wizard'));
         $bc = $el->render();
 
@@ -153,7 +153,7 @@ EOT
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', '#dashboard');
+        $el->item($this->lang->t9n('Home'), '#dashboard');
         $el->item($this->lang->t9n('Import wizard'), '#import/wizard');
         $el->item($this->lang->t9n('Import UID'));
         $bc = $el->render();
@@ -510,7 +510,7 @@ BODY
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', '#dashboard');
+        $el->item($this->lang->t9n('Home'), '#dashboard');
         $el->item($this->lang->t9n('Manual import'));
         $bc = $el->render();
 
@@ -1053,7 +1053,7 @@ EOT
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', '#dashboard');
+        $el->item($this->lang->t9n('Home'), '#dashboard');
         $el->item($this->lang->t9n('Import wizard'), '#import/wizard');
         $el->item($this->lang->t9n('Import PDFs'));
         $bc = $el->render();
@@ -1348,7 +1348,7 @@ BODY
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', '#dashboard');
+        $el->item($this->lang->t9n('Home'), '#dashboard');
         $el->item($this->lang->t9n('Import wizard'), '#import/wizard');
         $el->item($this->lang->t9n('Import metadata'));
         $bc = $el->render();

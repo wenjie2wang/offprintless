@@ -37,7 +37,7 @@ final class Ol extends ExternalDatabase implements ExternalDatabaseInterface {
      *
      * @param array $terms Search terms [[name => term]].
      * @param int $start Starting record for this page.
-     * @param int $rows Optional number of records per I, Librarian page.
+     * @param int $rows Optional number of records per page of results.
      * @param array|null $filters Optional array of filters [[name => value]].
      * @param string|null $sort Optional sorting string.
      * @return array

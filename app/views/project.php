@@ -516,7 +516,7 @@ EOT
 
             $el->style('margin: 0 -15px');
             $el->addClass('bg-transparent');
-            $el->item('IL', IL_BASE_URL . 'index.php/#dashboard/main');
+            $el->item($this->lang->t9n('Home'), IL_BASE_URL . 'index.php/#dashboard/main');
             $el->item($this->lang->t9n('Projects'), IL_BASE_URL . 'index.php/#projects/main');
             $el->item($this->lang->t9n('Edit'));
             $bc = $el->render();
@@ -554,7 +554,7 @@ EOT
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', IL_BASE_URL . 'index.php/#dashboard/main');
+        $el->item($this->lang->t9n('Home'), IL_BASE_URL . 'index.php/#dashboard/main');
         $el->item($this->lang->t9n('Projects'), IL_BASE_URL . 'index.php/#projects/main');
         $el->item($project['project'], '#project/browse?id=' . $project['id']);
         $el->item($this->lang->t9n('Edit'));
@@ -799,7 +799,7 @@ EOT
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', IL_BASE_URL . 'index.php/#dashboard/main');
+        $el->item($this->lang->t9n('Home'), IL_BASE_URL . 'index.php/#dashboard/main');
         $el->item($this->lang->t9n('Projects'), IL_BASE_URL . 'index.php/#projects/main');
         $el->item($messages['title'], '#project/browse?id=' . $project_id);
         $el->item($this->lang->t9n('Discussion'));
@@ -935,7 +935,7 @@ EOT
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', IL_BASE_URL . 'index.php/#dashboard/main');
+        $el->item($this->lang->t9n('Home'), IL_BASE_URL . 'index.php/#dashboard/main');
         $el->item($this->lang->t9n('Projects'), IL_BASE_URL . 'index.php/#projects/main');
         $el->item($notes['title'], '#project/browse?id=' . $project_id);
         $el->item($this->lang->t9n('Project notes'));
@@ -1048,7 +1048,7 @@ EOT;
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', IL_BASE_URL . 'index.php/#dashboard/main');
+        $el->item($this->lang->t9n('Home'), IL_BASE_URL . 'index.php/#dashboard/main');
         $el->item($this->lang->t9n('Projects'), IL_BASE_URL . 'index.php/#projects/main');
         $el->item($notes['title'], '#project/browse?id=' . $project_id);
         $el->item($this->lang->t9n('Note compilation'));

@@ -23,7 +23,7 @@ class DuplicatesView extends TextView {
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', '#dashboard');
+        $el->item($this->lang->t9n('Home'), '#dashboard');
         $el->item($this->lang->t9n('Duplicates'), '#duplicates');
         $bc = $el->render();
 
@@ -192,7 +192,7 @@ HTML
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', '#dashboard');
+        $el->item($this->lang->t9n('Home'), '#dashboard');
         $el->item($this->lang->t9n('Duplicates'), '#duplicates/main');
         $el->item($this->lang->t9n('Similar titles'));
         $bc = $el->render();
@@ -336,7 +336,7 @@ HTML
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', '#dashboard');
+        $el->item($this->lang->t9n('Home'), '#dashboard');
         $el->item($this->lang->t9n('Duplicates'), '#duplicates/main');
         $el->item($this->lang->t9n('Identical titles'));
         $bc = $el->render();
@@ -480,7 +480,7 @@ HTML
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', '#dashboard');
+        $el->item($this->lang->t9n('Home'), '#dashboard');
         $el->item($this->lang->t9n('Duplicates'), '#duplicates/main');
         $el->item($this->lang->t9n('Identical PDFs'));
         $bc = $el->render();

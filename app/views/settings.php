@@ -27,7 +27,7 @@ class SettingsView extends TextView {
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', '#dashboard');
+        $el->item($this->lang->t9n('Home'), '#dashboard');
         $el->item($this->lang->t9n('User settings'));
         $bc = $el->render();
 
@@ -1592,7 +1592,7 @@ EOT;
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', '#dashboard');
+        $el->item($this->lang->t9n('Home'), '#dashboard');
         $el->item($this->lang->t9n('Global settings'));
         $bc = $el->render();
 

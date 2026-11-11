@@ -1,5 +1,5 @@
 /*
- * I, Librarian.
+ * Offprintless (a fork of I, Librarian Free).
  */
 
 'use strict';

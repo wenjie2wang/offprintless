@@ -33,7 +33,7 @@ class EditView extends TextView {
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', IL_BASE_URL . 'index.php/#dashboard/main');
+        $el->item($this->lang->t9n('Home'), IL_BASE_URL . 'index.php/#dashboard/main');
         $el->item("{$item['title']}", '#summary?id=' . $item['id']);
         $el->item($this->lang->t9n('Edit item'));
         $bc = $el->render();

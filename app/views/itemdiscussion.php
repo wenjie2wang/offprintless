@@ -33,7 +33,7 @@ class ItemdiscussionView extends TextView {
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', IL_BASE_URL . 'index.php/#dashboard/main');
+        $el->item($this->lang->t9n('Home'), IL_BASE_URL . 'index.php/#dashboard/main');
         $el->item("{$messages['title']}", '#summary?id=' . $item_id);
         $el->item($this->lang->t9n('Discussion'));
         $bc = $el->render();

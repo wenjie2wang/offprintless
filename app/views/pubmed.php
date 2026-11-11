@@ -28,7 +28,7 @@ class PubmedView extends TextView {
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', '#dashboard');
+        $el->item($this->lang->t9n('Home'), '#dashboard');
         $el->item("Pubmed {$this->lang->t9n('Search-NOUN')}");
         $bc = $el->render();
 

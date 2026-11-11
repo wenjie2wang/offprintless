@@ -4,7 +4,7 @@
 ini_set('display_errors', 1);
 
 /*
- * I, Librarian version.
+ * Offprintless version.
  */
 const IL_VERSION = '5.11.3';
 

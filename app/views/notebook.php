@@ -29,7 +29,7 @@ class NotebookView extends TextView {
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', IL_BASE_URL . 'index.php/#dashboard/main');
+        $el->item($this->lang->t9n('Home'), IL_BASE_URL . 'index.php/#dashboard/main');
         $el->item($title, '#project/browse?id=' . $project_id);
         $el->item($this->lang->t9n('Notebook'));
         $bc = $el->render();

@@ -676,7 +676,7 @@ HTML;
             $links .= "<a class=\"mr-3\" href=\"$url\">" . parse_url($url, PHP_URL_HOST) . "</a> ";
         }
 
-        // I, Librarian stable link.
+        // Stable link.
         $IL_BASE_URL = IL_BASE_URL;
         $links .= "<a class=\"mr-3\" href=\"{$IL_BASE_URL}stable.php?id={$item['id']}\">{$this->lang->t9n('Stable link')}</a>";
 
@@ -716,7 +716,7 @@ HTML;
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', '#dashboard');
+        $el->item($this->lang->t9n('Home'), '#dashboard');
         $el->item("$label " . $this->lang->t9n('search-NOUN'));
         $bc = $el->render();
 

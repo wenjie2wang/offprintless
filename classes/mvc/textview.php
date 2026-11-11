@@ -57,6 +57,11 @@ abstract class TextView extends View {
     protected string $content_type = '';
     protected string $head_links = '';
     protected string $script = '';
+    /**
+     * Version of the icon files in public/img. Change it whenever they change, so browsers fetch them again.
+     */
+    public const ICON_VERSION = 'offprintless-1';
+
     protected string $script_links = '';
     protected string $style = '';
     protected string $title = '';
@@ -205,6 +210,8 @@ abstract class TextView extends View {
             // HTML. Construct <head> and open <body>.
             $IL_BASE_URL = IL_BASE_URL;
             $IL_VERSION = IL_VERSION;
+            // Browsers keep tab icons for a very long time. The icons have their own version, changed when they change.
+            $IL_ICON_VERSION = self::ICON_VERSION;
 
             $this->append(<<<EOT
                 <!DOCTYPE HTML>
@@ -214,14 +221,14 @@ abstract class TextView extends View {
                         <meta charset="UTF-8">
                         <meta name="viewport" content="width=device-width, initial-scale=1.0">
                         <meta http-equiv="X-UA-Compatible" content="IE=edge">
-                        <link rel="apple-touch-icon" sizes="180x180" href="{$IL_BASE_URL}img/apple-touch-icon.png?v=$IL_VERSION">
-                        <link rel="icon" type="image/png" sizes="32x32" href="{$IL_BASE_URL}img/favicon-32x32.png?v=$IL_VERSION">
-                        <link rel="icon" type="image/png" sizes="16x16" href="{$IL_BASE_URL}img/favicon-16x16.png?v=$IL_VERSION">
-                        <link rel="manifest" href="{$IL_BASE_URL}img/manifest.json?v=$IL_VERSION">
-                        <link rel="mask-icon" href="{$IL_BASE_URL}img/safari-pinned-tab.svg?v=$IL_VERSION" color="#2f8ded">
-                        <link rel="shortcut icon" href="{$IL_BASE_URL}img/favicon.ico?v=$IL_VERSION">
-                        <meta name="msapplication-config" content="{$IL_BASE_URL}img/browserconfig.xml?v=$IL_VERSION">
-                        <meta name="theme-color" content="#333333">
+                        <link rel="apple-touch-icon" sizes="180x180" href="{$IL_BASE_URL}img/apple-touch-icon.png?v=$IL_ICON_VERSION">
+                        <link rel="icon" type="image/png" sizes="32x32" href="{$IL_BASE_URL}img/favicon-32x32.png?v=$IL_ICON_VERSION">
+                        <link rel="icon" type="image/png" sizes="16x16" href="{$IL_BASE_URL}img/favicon-16x16.png?v=$IL_ICON_VERSION">
+                        <link rel="manifest" href="{$IL_BASE_URL}img/manifest.json?v=$IL_ICON_VERSION">
+                        <link rel="mask-icon" href="{$IL_BASE_URL}img/safari-pinned-tab.svg?v=$IL_ICON_VERSION" color="#1f4e8c">
+                        <link rel="shortcut icon" href="{$IL_BASE_URL}img/favicon.ico?v=$IL_ICON_VERSION">
+                        <meta name="msapplication-config" content="{$IL_BASE_URL}img/browserconfig.xml?v=$IL_ICON_VERSION">
+                        <meta name="theme-color" content="#1f4e8c">
                         $this->head_links
                         <link href="{$IL_BASE_URL}css/style.css?v=$IL_VERSION" rel="stylesheet">
                         $theme_css

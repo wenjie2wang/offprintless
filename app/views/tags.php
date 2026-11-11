@@ -27,7 +27,7 @@ class TagsView extends TextView {
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', IL_BASE_URL . 'index.php/#dashboard/main');
+        $el->item($this->lang->t9n('Home'), IL_BASE_URL . 'index.php/#dashboard/main');
         $el->item("{$tags['title']}", '#summary?id=' . $id);
         $el->item($this->lang->t9n('Tags'));
         $bc = $el->render();
@@ -206,7 +206,7 @@ class TagsView extends TextView {
 
         $el->style('margin: 0 -15px');
         $el->addClass('bg-transparent');
-        $el->item('IL', '#dashboard');
+        $el->item($this->lang->t9n('Home'), '#dashboard');
         $el->item($this->lang->t9n('Tags'));
         $bc = $el->render();
 

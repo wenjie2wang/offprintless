@@ -42,7 +42,7 @@ final class Session {
         // Session settings.
         $cookie_secure = $this->app_settings->getIni('session', 'cookie_secure');
 
-        ini_set('session.name', 'IL');
+        ini_set('session.name', 'OFFPRINTLESS');
         ini_set('session.cookie_path', parse_url(IL_BASE_URL, PHP_URL_PATH));
         ini_set('session.cookie_secure', (integer) $cookie_secure);
         ini_set('session.cookie_httponly', 1);

@@ -23,8 +23,8 @@ and PHP for you. If you don't want that, follow the instructions below to instal
   * Edit Apache configuration file (httpd.conf). Append this at the end using Notepad and edit as needed:
 
 ```apache_conf
-Alias /librarian "C:\I, Librarian\public"
-<Directory "C:\I, Librarian\public">
+Alias /offprintless "C:\Offprintless\public"
+<Directory "C:\Offprintless\public">
     AllowOverride All
     # Allow access from this computer.
     Require local
@@ -42,17 +42,17 @@ Alias /librarian "C:\I, Librarian\public"
   * You may wish to alter who has access (e.g. to allow access from more IP numbers or domain names) - see the
     Apache [Authentication and Authorization HOWTO](https://httpd.apache.org/docs/2.4/howto/auth.html) for details.
   * Restart the server.
-  * Unzip *I, Librarian* distributable files into `C:\I, Librarian`.
-  * You may change `C:\I, Librarian` to any directory where you want to have *I, Librarian*,
+  * Unzip the *Offprintless* files into `C:\Offprintless`.
+  * You may change `C:\Offprintless` to any directory where you want to have *Offprintless*,
     including an external drive.
-  * Now you can access your library in a browser at http://127.0.0.1/librarian
+  * Now you can access your library in a browser at http://127.0.0.1/offprintless
   * *Optional.* You can install LibreOffice and Tesseract OCR to enable importing Office files and OCR, respectively. 
 
 ### First use
 * Note on security: These installation instructions allow access to your library only from local computer
   or an internal network.
 * In order to start *Offprintless*, open your web browser, and visit:
-  [http://127.0.0.1/librarian](http://127.0.0.1/librarian)
+  [http://127.0.0.1/offprintless](http://127.0.0.1/offprintless)
 * Replace `127.0.0.1` with your static IP, or qualified server domain name, if you have either one.
 * Migrate your previous library, or create an account and head to `Administrator > Software details` to see if everything checks fine.
 * You should also check `Administrator > Global settings` to run *Offprintless* the way you want.
