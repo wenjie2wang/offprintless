@@ -4871,26 +4871,23 @@ class ImportUidView extends View {
                 });
                 break;
             case 'ARXIV':
-                let arxivid = uid.replace(/arxiv:\s?/i, '');
-                $.when(model.load({url: arxiv.url + arxivid, cors: true, dataType: 'xml'})).done(function (response) {
-                    let entry = $(response).find('entry'), itemTitle = entry.children('title').text();
-                    if (itemTitle === '') {
+                $.when(model.load({
+                    url: window.IL_BASE_URL + 'index.php/arxiv/fetch',
+                    data: {'uid': uid}
+                })).done(function (response) {
+                    let item = (response.items || [])[0] || [];
+                    if (typeof item.title === 'undefined') {
                         $('#uid-message').removeClass('d-none').addClass('d-flex');
                         $('#fetch-record').addClass('d-none');
                         $('#upload-form').find(':submit, .reload-button').removeClass('d-none');
                     } else {
-                        $('.import-wizard-uid').html('Record found:<h5><a href="' + entry.children('id').text() + '" target="_blank">'
-                            + itemTitle + '</a></h5>');
-                        $('#metadata').val(arxiv.metadata($(response)));
+                        $('.import-wizard-uid').html('Record found:<h5><a href="' + item.urls[0] + '" target="_blank">'
+                            + item.title + '</a></h5>');
+                        $('.uploadable-url').val(item.urls[1] || '');
+                        $('#metadata').val(JSON.stringify(item));
                         $('#fetch-record').addClass('d-none');
                         $('#upload-form').find(':submit, .reload-button').removeClass('d-none');
                         $('#phase-2').removeClass('d-none');
-                    }
-                }).fail(function (xhr) {
-                    if (xhr.status === 400) {
-                        $('#uid-message').removeClass('d-none').addClass('d-flex');
-                        $('#fetch-record').addClass('d-none');
-                        $('#upload-form').find(':submit, .reload-button').removeClass('d-none');
                     }
                 });
                 break;

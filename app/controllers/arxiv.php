@@ -36,6 +36,30 @@ class ArxivController extends AppController {
     }
 
     /**
+     * Fetch arXiv metadata. Used by the UID import wizard. The browser cannot ask arXiv directly (no CORS headers).
+     *
+     * @return string
+     * @throws Exception
+     */
+    public function fetchAction(): string {
+
+        $this->session->close();
+
+        // Authorization.
+        $this->authorization->signedId(true);
+        $this->authorization->permissions('U');
+
+        // Model.
+        $this->arxiv = $this->di->getShared('Arxiv');
+
+        $items = $this->arxiv->fetch($this->get['uid'] ?? '');
+
+        // View.
+        $view = new DefaultView($this->di);
+        return $view->main($items ?? []);
+    }
+
+    /**
      * Search and list results.
      *
      * @return string
