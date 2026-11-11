@@ -15,3 +15,7 @@ package.sh
 *.db-shm
 .DS_Store
 tests/.tracked
+## Project-local only, never commit
+CLAUDE.md
+## macOS sed -i -E backup artifacts
+app/views/*-E
