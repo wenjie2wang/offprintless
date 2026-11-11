@@ -1174,6 +1174,8 @@ EOT;
             . $row('ai-embed-base-url', 'ai_embed_base_url', 'Service address (if different)', 'e.g. http://172.19.0.1:11434/v1')
             . $row('ai-embed-api-key', 'api_ai_embed', 'API key (if different)', 'Used only for the address above. Also OFFPRINTLESS_API_AI_EMBED. The chat key is never sent to this service.', 'password')
             . $row('ai-embed-model', 'ai_embed_model', 'Embedding model')
+            . $row('ai-embed-query-prefix', 'ai_embed_query_prefix', 'Prefix for a question (optional)', 'Some models need it, e.g. "search_query: " for nomic-embed-text. Leave empty if unsure. Changing it rebuilds the search index.')
+            . $row('ai-embed-doc-prefix', 'ai_embed_doc_prefix', 'Prefix for a paper (optional)', 'e.g. "search_document: " for nomic-embed-text.')
             . '<div class="mt-3"><b>' . $t('Limits') . '</b></div>'
             . $row('ai-context', 'ai_context_window', 'Context window of the chat model (tokens)')
             . $row('ai-daily', 'ai_daily_tokens', 'Tokens per user per day (0 for no limit)')

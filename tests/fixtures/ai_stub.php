@@ -7,7 +7,7 @@ $counter = sys_get_temp_dir() . '/ai-stub-count-' . md5($_SERVER['HTTP_X_TEST'] 
 
 header('Content-Type: application/json');
 
-if ($auth !== 'Bearer secret-key' && $auth !== 'Bearer chat-only-key') {
+if ($path !== '/__last' && $auth !== 'Bearer secret-key' && $auth !== 'Bearer chat-only-key') {
     http_response_code(401);
     echo json_encode(['error' => ['message' => 'bad key']]);
     return;
@@ -31,11 +31,21 @@ if ($path === '/v1/embeddings') {
         echo json_encode(['error' => ['message' => 'model "missing" not found']]);
         return;
     }
+    // Record what was sent, so a test can see the prefixes: GET /__last returns the inputs of the last request.
+    file_put_contents(sys_get_temp_dir() . '/ai-stub-last-' . md5($_SERVER['HTTP_X_TEST'] ?? 'x'), json_encode($body['input']));
     $data = [];
     $inputs = array_reverse((array) $body['input']);   // out of order on purpose: the client must sort by index
     $count = count($inputs);
     foreach ($inputs as $i => $text) {
         $idx = $count - 1 - $i;
+        // Word-hash vectors, so that texts that share words are close: enough to see search by meaning work end to end.
+        if (($body['model'] ?? '') === 'words') {
+            $v = array_fill(0, 1024, 0.0);
+            foreach (preg_split('/[^a-z0-9]+/', strtolower((string) $text), -1, PREG_SPLIT_NO_EMPTY) as $w) { $v[crc32($w) % 1024] += 1.0; }
+            $n = sqrt(array_sum(array_map(fn($x) => $x * $x, $v))) ?: 1.0;
+            $data[] = ['index' => $idx, 'embedding' => array_map(fn($x) => $x / $n, $v)];
+            continue;
+        }
         $data[] = ['index' => $idx, 'embedding' => [strlen($text) / 100, 1.0, 0.5]];
     }
     echo json_encode(['data' => $data, 'usage' => ['prompt_tokens' => 7, 'total_tokens' => 7]]);
@@ -58,6 +68,11 @@ if ($path === '/v1/chat/completions') {
     $send(['choices' => [['delta' => ['content' => 'world']]]]);
     $send(['choices' => [], 'usage' => ['prompt_tokens' => 11, 'completion_tokens' => 3]]);
     echo "data: [DONE]\n\n";
+    return;
+}
+
+if ($path === '/__last') {
+    echo (string) @file_get_contents(sys_get_temp_dir() . '/ai-stub-last-' . md5($_SERVER['HTTP_X_TEST'] ?? 'x'));
     return;
 }
 

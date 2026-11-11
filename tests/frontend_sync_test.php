@@ -50,5 +50,22 @@ foreach (['src' => $src, 'min' => $min] as $label => $code) {
 preg_match('/class GlobalSettingsMainView.*?views\.globalsettingsmain/s', $src, $gs);
 check('the settings view writes the test result as text, never .html(', [str_contains($gs[0] ?? '', "#ai-test-result"), preg_match('/\.html\(/', $gs[0] ?? '')], [true, 0]);
 
+// Search by meaning: the build link, and the similar-papers page, which is an ordinary result list.
+foreach (['src' => $src, 'min' => $min] as $label => $code) {
+    check("the similar-papers page has a view ($label)", str_contains($code, 'views.semanticsimilar'), true);
+    check("semanticBuild exists ($label)", str_contains($code, 'function semanticBuild('), true);
+}
+
+// A body-level handler on every link returns false for href="#" and so stops the event before it can reach a handler
+// bound on document. The build link must be bound on body, ahead of it (a handler bound first on the same element runs first).
+foreach (['src' => $src, 'min' => $min] as $label => $code) {
+    check("the build link is bound on body, not document ($label)", [preg_match('/\\$\\(document\\)\\.on\\(\\s*[\'"]click[\'"]\\s*,\\s*[\'"]#semantic-build/', $code), preg_match('/\\$\\([\'"]body[\'"]\\)\\.on\\(\\s*[\'"]click[\'"]\\s*,\\s*[\'"]#semantic-build/', $code)], [0, 1]);
+}
+
+// The word highlighter must leave a search by meaning alone: its query is a question, not words to find.
+foreach (['src' => $src, 'min' => $min] as $label => $code) {
+    check("the highlighter skips searches by meaning ($label)", preg_match('/search_type[^;]{0,200}meaning|meaning[^;]{0,200}search_type/s', $code) === 1 && str_contains($code, 'highlightSearch'), true);
+}
+
 echo $fails === 0 ? "\nALL PASSED\n" : "\n$fails FAILED\n";
 exit($fails === 0 ? 0 : 1);

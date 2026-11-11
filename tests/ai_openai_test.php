@@ -82,6 +82,30 @@ check('a broken chat model does not fail the embeddings part', $r['ok'] === true
 $r = $make(['embed_model' => ''])->selfTest('embeddings');
 check('embeddings part with no embedding model says so', $r['ok'] === false && str_contains($r['message'], 'embedding model'), json_encode($r));
 
+echo "--- prefixes for queries and documents ---\n";
+$last = function () use ($port) { return json_decode((string) @file_get_contents("http://127.0.0.1:$port/__last"), true); };
+$make(['embed_model' => 'emb'])->embed(['alpha', 'beta'], 'document');
+check('no prefix by default: texts go as they are', $last() === ['alpha', 'beta'], json_encode($last()));
+// The settings form trims what is typed, so a prefix arrives as "search_query:". One space is added after it.
+$trimmed = $make(['query_prefix' => 'search_query:', 'doc_prefix' => 'search_document:']);
+$trimmed->embed(['delta'], 'query');
+check('a prefix typed without its trailing space still gets one space before the text', $last() === ['search_query: delta'], json_encode($last()));
+$trimmed->embed(['delta'], 'document');
+check('...for documents too', $last() === ['search_document: delta'], json_encode($last()));
+$make(['query_prefix' => 'query:'])->embed(['eps'], 'query');
+check('a short prefix works the same way', $last() === ['query: eps'], json_encode($last()));
+check('a prefix with its own space is not doubled', (function () use ($make, $last) { $make(['query_prefix' => 'q: '])->embed(['z'], 'query'); return $last() === ['q: z']; })());
+check('the id is the same with or without the typed space', $make(['query_prefix' => 'q:'])->id() === $make(['query_prefix' => 'q: '])->id());
+$pre = $make(['query_prefix' => 'search_query: ', 'doc_prefix' => 'search_document: ']);
+$pre->embed(['alpha', 'beta'], 'document');
+check('documents get the document prefix', $last() === ['search_document: alpha', 'search_document: beta'], json_encode($last()));
+$pre->embed(['gamma'], 'query');
+check('queries get the query prefix', $last() === ['search_query: gamma'], json_encode($last()));
+check('the prefixes are part of the model id, so changing them rebuilds the index', $pre->id() !== $make()->id() && str_contains($pre->id(), 'emb'), $pre->id() . ' / ' . $make()->id());
+check('the same prefixes give the same id', $pre->id() === $make(['query_prefix' => 'search_query: ', 'doc_prefix' => 'search_document: '])->id());
+check('only one prefix set still changes the id', $make(['doc_prefix' => 'd: '])->id() !== $make()->id());
+check('the returned vectors are unaffected by the prefix', count($pre->embed(['x'], 'document')) === 1);
+
 proc_terminate($proc);
 echo $fails === 0 ? "\nALL PASSED\n" : "\n$fails FAILED\n";
 exit($fails === 0 ? 0 : 1);

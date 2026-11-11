@@ -135,4 +135,74 @@ final class VectorStore {
         );
         $this->db->run('DELETE FROM chats WHERE scope = ? AND scope_id = ?', [$scope, $scope_id]);
     }
+
+    /**
+     * The fingerprints of the vectors that exist for these papers, to see which are out of date.
+     *
+     * @param int[] $item_ids
+     * @return array item id => text_hash, for the papers that have a vector of this kind from this model.
+     */
+    public function hashes(array $item_ids, string $kind, string $model_id): array {
+
+        $out = [];
+
+        foreach (array_chunk(array_values(array_map('intval', $item_ids)), 500) as $chunk) {
+
+            $marks = join(',', array_fill(0, count($chunk), '?'));
+            $this->db->run(
+                "SELECT item_id, text_hash FROM vectors WHERE kind = ? AND model_id = ? AND item_id IN ($marks)",
+                array_merge([$kind, $model_id], $chunk)
+            );
+
+            foreach ($this->db->getResultRows() as $row) {
+
+                $out[(int) $row['item_id']] = (string) $row['text_hash'];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Rank papers by closeness to a query vector. Only the candidates given are considered, so the caller decides
+     * what the person may see; nothing here knows about access.
+     *
+     * @param int[] $item_ids Candidates.
+     * @return array [['item_id' => int, 'score' => float], ...] best first.
+     */
+    public function rank(array $item_ids, string $kind, string $model_id, array $query): array {
+
+        $out = [];
+
+        foreach (array_chunk(array_values(array_map('intval', $item_ids)), 500) as $chunk) {
+
+            $marks = join(',', array_fill(0, count($chunk), '?'));
+            $this->db->run(
+                "SELECT item_id, vec FROM vectors WHERE kind = ? AND model_id = ? AND item_id IN ($marks)",
+                array_merge([$kind, $model_id], $chunk)
+            );
+
+            foreach ($this->db->getResultRows() as $row) {
+
+                $out[] = ['item_id' => (int) $row['item_id'], 'score' => self::cosine($query, self::unpack($row['vec']))];
+            }
+        }
+
+        usort($out, fn($a, $b) => $b['score'] <=> $a['score'] ?: $a['item_id'] <=> $b['item_id']);
+
+        return $out;
+    }
+
+    /**
+     * The vector of one paper, or null.
+     *
+     * @return float[]|null
+     */
+    public function vector(int $item_id, string $kind, string $model_id): ?array {
+
+        $this->db->run('SELECT vec FROM vectors WHERE item_id = ? AND kind = ? AND model_id = ? ORDER BY chunk_no LIMIT 1', [$item_id, $kind, $model_id]);
+        $vec = $this->db->getResult();
+
+        return $vec ? self::unpack($vec) : null;
+    }
 }

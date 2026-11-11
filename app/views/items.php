@@ -46,6 +46,7 @@ class ItemsView extends TextView {
             'itemnotes' => $this->lang->t9n('Notes'),
             'uid'       => 'UID',
             'itemid'    => $this->lang->t9n('Item') . ' ID',
+            'meaning'   => $this->lang->t9n('Meaning'),
             'TI'        => $this->lang->t9n('Title'),
             'AB'        => "{$this->lang->t9n('Title')} {$this->lang->t9n('or')} {$this->lang->t9n('Abstract')}",
             'AU'        => "{$this->lang->t9n('Author')} {$this->lang->t9n('or')} {$this->lang->t9n('Editor')}",
@@ -344,6 +345,12 @@ class ItemsView extends TextView {
                 $bc_title = $this->lang->t9n('Library');
         }
 
+        // The page of papers similar to one paper.
+        if (isset($input['similar_to'])) {
+
+            $bc_title = sprintf($this->lang->t9n('Similar to %s'), $input['similar_to']);
+        }
+
         /** @var Bootstrap\Breadcrumb $el */
         $el = $this->di->get('Breadcrumb');
 
@@ -373,8 +380,17 @@ class ItemsView extends TextView {
 
             $item_count = "<div class=\"text-muted w-100 pb-3 pb-lg-0\">{$this->lang->t9n('No items')}</div>";
 
+            // After a search by meaning the usual reason for no result is an index that is not built yet, or a question
+            // too far from any paper; the tips for word search would only mislead.
+            if (isset($input['meaning'])) {
+
+                $notes_html = $this->meaningNote($input['meaning']);
+                $notes_html .= '<div class="alert alert-info mb-3"><b>' . $this->lang->t9n('No results. Things to try:') . '</b><ul class="mb-0 pl-3"><li>' .
+                    $this->lang->t9n('Describe the topic in a sentence, as you would to a colleague.') . '</li><li>' .
+                    $this->lang->t9n('Papers that were added or changed recently may not be indexed yet.') . '</li></ul></div>';
+
             // After a search, say what to try. Words match as whole words, which is the usual reason for no result.
-            if (isset($get['search_type'])) {
+            } elseif (isset($get['search_type'])) {
 
                 $hints = [
                     $this->lang->t9n('Words match as whole words: use a * to match a beginning or an end, for example estim*.'),
@@ -410,6 +426,11 @@ class ItemsView extends TextView {
             // Put together the item counter.
             $item_count = '<div class="text-muted w-100 pb-3 pb-lg-0">' .
                 sprintf($this->lang->t9n('Items %s of %s'), $from . ' - ' . $last, $total_count) . '</div>';
+
+            if (isset($input['meaning'])) {
+
+                $notes_html = $this->meaningNote($input['meaning']);
+            }
 
             // A search returns at most max_items results. When it reached the limit, there are more than are listed.
             if (isset($get['search_type']) && (int) $input['total_count'] >= (int) $this->app_settings->getGlobal('max_items')) {
@@ -853,6 +874,49 @@ EOT;
     }
 
     /**
+     * The similarity of a result found by meaning, as a small percentage badge. Empty for every other kind of result.
+     *
+     * @param array $item
+     * @return string
+     */
+    private function scoreBadge(array $item): string {
+
+        if (isset($item['score']) === false) {
+
+            return '';
+        }
+
+        $percent = max(0, min(100, (int) round(((float) $item['score']) * 100)));
+
+        return ' <span class="badge badge-secondary ml-1 ms-1" title="'
+            . htmlspecialchars($this->lang->t9n('similarity to what you wrote'), ENT_QUOTES) . '">'
+            . $percent . '% ' . htmlspecialchars($this->lang->t9n('similarity'), ENT_QUOTES) . '</span>';
+    }
+
+    /**
+     * The note above results found by meaning: how many papers are not searchable by meaning yet, with the button that
+     * indexes them. The model name is escaped; it comes from the administrator's settings.
+     *
+     * @param array $meaning ['pending' => int, 'model' => string]
+     * @return string
+     */
+    private function meaningNote(array $meaning): string {
+
+        $pending = (int) ($meaning['pending'] ?? 0);
+
+        if ($pending < 1) {
+
+            return '';
+        }
+
+        return '<div class="alert alert-info mb-3" id="semantic-note">'
+            . htmlspecialchars(sprintf($this->lang->t9n('%s papers are not searchable by meaning yet.'), number_format($pending)), ENT_QUOTES)
+            . ' <a href="#" id="semantic-build" class="alert-link">' . htmlspecialchars($this->lang->t9n('Index them now'), ENT_QUOTES) . '</a>'
+            . '<div class="progress mt-2 d-none" id="semantic-progress" style="height:6px"><div class="progress-bar" style="width:0%"></div></div>'
+            . '<div class="small mt-1" id="semantic-status"></div></div>';
+    }
+
+    /**
      * Assemble HTML for title item list.
      *
      * @param array $items
@@ -1027,7 +1091,7 @@ EOT;
                                 $pdf_link
                             </td>
                             <td class="pl-1 pt-3 pr-5" style="height: 3.5rem">
-                                <h5><a href="{$IL_BASE_URL}index.php/item#summary?id={$item['id']}">{$item['title']}</a></h5>
+                                <h5><a href="{$IL_BASE_URL}index.php/item#summary?id={$item['id']}">{$item['title']}</a>{$this->scoreBadge($item)}</h5>
                                 <span class="mr-1">{$authors}</span> <span class="mr-1">{$date}</span> {$publication}
                             </td>
                         </tr>
@@ -1130,7 +1194,7 @@ EOT;
                         <td class="px-3 py-3">{$pdf_link}</td>
                         <td class="px-3 py-3 text-truncate d-none d-md-table-cell">{$authors}</td>
                         <td class="px-3 py-3 text-truncate">
-                            <a href="{$IL_BASE_URL}index.php/item#summary?id={$item['id']}">{$item['title']}</a>
+                            <a href="{$IL_BASE_URL}index.php/item#summary?id={$item['id']}">{$item['title']}</a>{$this->scoreBadge($item)}
                         </td>
                         <td class="px-3 py-3 text-truncate d-none d-xl-table-cell">{$date}</td>
                         <td class="px-3 py-3 text-truncate d-none d-xl-table-cell">{$publication}</td>
@@ -1298,7 +1362,7 @@ EOT;
                 <div class="px-3 pt-2 pb-1 border-darker-top">
                     <div class="d-table" style="table-layout: fixed;width: 100%;">
                         <div class="d-table-cell align-middle text-truncate">
-                            <a href="{$IL_BASE_URL}index.php/item#summary?id={$item['id']}">{$item['title']}</a>
+                            <a href="{$IL_BASE_URL}index.php/item#summary?id={$item['id']}">{$item['title']}</a>{$this->scoreBadge($item)}
                         </div>
                     </div>
                     $button $check
@@ -1531,7 +1595,7 @@ EOT;
                                 {$pdf_link}
                             </td>
                             <td class="pt-3 pr-3">
-                                <h5><a href="{$IL_BASE_URL}index.php/item#summary?id={$item['id']}">{$item['title']}</a></h5>
+                                <h5><a href="{$IL_BASE_URL}index.php/item#summary?id={$item['id']}">{$item['title']}</a>{$this->scoreBadge($item)}</h5>
                                 <span class="mr-1">{$authors}</span> <span class="mr-1">{$date}</span> {$publication}
                             </td>
                         </tr>
@@ -2437,7 +2501,8 @@ SCRIPT;
         // Get the first valid search query.
         foreach ($get['search_query'] as $key => $query) {
 
-            if (empty($query) || $get['search_type'][$key] === 'itemid') {
+            // A question asked by meaning is a sentence, not a word to find in the PDF.
+            if (empty($query) || in_array($get['search_type'][$key], ['itemid', 'meaning'], true)) {
 
                 continue;
             }

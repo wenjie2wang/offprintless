@@ -122,6 +122,13 @@ HTML
         $el->option($this->lang->t9n('Notes'), 'itemnotes');
         $el->option("UID (DOI, PMID,&hellip;)", 'uid');
         $el->option("{$this->lang->t9n('Item')} ID", 'itemid');
+
+        // Search by meaning: offered only to someone for whom AI features are allowed.
+        if (\Librarian\Ai\AiGate::offered($this->app_settings->getGlobal(), $this->app_settings->getUser())) {
+
+            $el->option($this->lang->t9n('Meaning (AI)'), 'meaning');
+        }
+
         $search_type = $el->render();
 
         $el = null;

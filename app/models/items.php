@@ -915,6 +915,12 @@ EOT;
             return $this->searchUids($uids, $collection, $limit, $offset, $display_action, $project_id);
         }
 
+        // Search by meaning: the papers closest to what was written, in that order.
+        if ($search['search_type'][0] === 'meaning') {
+
+            return $this->searchMeaning($search['search_query'][0], $collection, $limit, $offset, $display_action, $project_id);
+        }
+
         // Item note search.
         if ($search['search_type'][0] === 'pdfnotes') {
 
@@ -945,7 +951,7 @@ EOT;
      */
     private function assertSearchRequest(array $search): void {
 
-        $types = ['metadata', 'anywhere', 'FT', 'pdfnotes', 'itemnotes', 'uid', 'itemid',
+        $types = ['metadata', 'anywhere', 'FT', 'pdfnotes', 'itemnotes', 'uid', 'itemid', 'meaning',
                   'TI', 'AB', 'AU', 'AF', 'T1', 'T2', 'T3', 'JO', 'KW', 'YR', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8'];
 
         foreach (['search_query', 'search_type'] as $key) {
@@ -965,7 +971,7 @@ EOT;
             }
 
             // Every field of a text search has an operator. The id, UID and note searches ignore it.
-            if (in_array($search['search_type'][$i], ['uid', 'itemid'], true) === false
+            if (in_array($search['search_type'][$i], ['uid', 'itemid', 'meaning'], true) === false
                 && isset($search['search_boolean'][$i]) === false) {
 
                 throw new Exception('invalid search parameters', 422);
@@ -1751,6 +1757,104 @@ EOT;
         $this->db_main->commit();
 
         $rows = null;
+
+        return $output;
+    }
+
+    /**
+     * The item rows for a list of ids the caller has already decided the person may see, in the order given. Anything
+     * not visible is dropped here as well, so a stale id can never show a paper.
+     *
+     * @param int[] $item_ids
+     * @param string $display_action title|icon|summary|table
+     * @return array
+     */
+    protected function _listIds(array $item_ids, string $display_action = 'title'): array {
+
+        $item_ids = array_values(array_unique(array_map('intval', $item_ids)));
+
+        if ($item_ids === []) {
+
+            return [];
+        }
+
+        $this->db_main->run(
+            'SELECT id FROM items WHERE id IN (' . join(',', $item_ids) . ") AND id IN ({$this->visibleItems()})"
+        );
+        $visible = array_flip(array_map('intval', array_column($this->db_main->getResultRows(), 'id')));
+        $rows = [];
+
+        foreach ($item_ids as $id) {
+
+            if (isset($visible[$id])) {
+
+                $rows[] = ['item_id' => $id];
+            }
+        }
+
+        $this->db_main->beginTransaction();
+        $items = $this->itemData($rows, $display_action);
+        $this->db_main->commit();
+
+        return $items;
+    }
+
+    /**
+     * Search by meaning. The ranking and everything about who may see what is in SemanticModel; this only turns its
+     * ordered ids into the same item rows every other search returns, so paging, export and the result views work
+     * unchanged.
+     *
+     * @return array ['items' => [...], 'total_count' => int, 'meaning' => ['pending' => int, 'model' => string]]
+     * @throws Exception 403, 404, 422, 502, 503
+     */
+    private function searchMeaning(
+        string $query,
+        string $collection,
+        int $limit,
+        int $offset,
+        $display_action,
+        ?int $project_id
+    ): array {
+
+        $semantic = new SemanticModel($this->di);
+        $export = $display_action === 'export' || is_array($display_action);
+
+        $found = $semantic->search(
+            $query,
+            $collection === 'project' || $collection === 'clipboard' ? $collection : 'library',
+            $project_id,
+            $export ? (int) $this->app_settings->getGlobal('max_items') : $limit,
+            $export ? 0 : $offset
+        );
+
+        $output = [
+            'items'       => [],
+            'total_count' => (int) $found['total'],
+            'meaning'     => ['pending' => (int) $found['pending'], 'model' => $found['model']]
+        ];
+
+        if ($found['ranked'] === []) {
+
+            return $output;
+        }
+
+        $rows = array_map(fn($r) => ['item_id' => (int) $r['item_id']], $found['ranked']);
+
+        if (is_array($display_action)) {
+
+            $this->omnitool(array_column($rows, 'item_id'), $display_action, $collection === 'project' && is_int($project_id) ? $project_id : null);
+
+            return [];
+        }
+
+        $this->db_main->beginTransaction();
+        $output['items'] = $this->itemData($rows, $display_action);
+        $this->db_main->commit();
+
+        foreach ($output['items'] as $i => $item) {
+
+            $output['items'][$i]['score'] = round((float) $found['ranked'][$i]['score'], 4);
+        }
 
         return $output;
     }

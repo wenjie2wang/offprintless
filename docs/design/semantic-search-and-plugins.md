@@ -319,6 +319,14 @@ I would make the app image and the worker the same image, so there is one build 
 
 Anthropic's OpenAI-compatible endpoint has no `/v1/embeddings` (it answers 404), so Claude can answer but cannot embed. The settings therefore have a separate, optional embedding address and key (`ai_embed_base_url`, `api_ai_embed` or `OFFPRINTLESS_API_AI_EMBED`). With the address empty, one service does both, as before. With it set, embeddings go there with their own key; **the chat key is never sent to the embedding service**. Test connection checks chat and embeddings separately and reports one line for each, so a chat-only service shows "Chat: works" and "Embeddings: FAILED" instead of one opaque error. `Librarian\Ai\ProviderConfig` holds the rule.
 
+### 10.9 Search by meaning (built)
+
+One vector per paper: the title and the first 2,000 characters of its text (the abstract area), or the stored abstract when a PDF has no text. They are made from a button, **Index them now**, that appears on the results page of a search by meaning when papers are missing: the browser asks for 25 papers at a time and shows a progress bar. There is no background worker; the build is resumable, safe to run twice, and counted against the person's daily token limit. Only papers the person can see are embedded, so the consent rule is the same as for chat: text leaves the server only because a consenting user pressed the button.
+
+The quick search gets a **Meaning (AI)** type, shown only to people for whom AI is allowed. Results are the closest papers above a score floor (an absolute minimum, `ai_semantic_min_score`, and 60% of the best score), with a similarity badge, and paging, export, projects and the clipboard work as for any search. Each item page has **Similar papers**. Vectors are kept per embedding model and per prefix setting; changing either starts a new set. `Librarian\Ai\PaperIndex`, `SemanticModel`, `SemanticController`.
+
+Query and document prefixes (`ai_embed_query_prefix`, `ai_embed_doc_prefix`) are optional settings for models that rank better with them, for example `search_query:` and `search_document:` for nomic-embed-text.
+
 ## 11. Decision 4: PDF text and outside services (settled)
 
 Decided: embeddings come from an API, and text may leave `tars` once a user has allowed it through the per-user switch.

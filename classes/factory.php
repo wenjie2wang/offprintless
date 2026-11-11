@@ -574,7 +574,9 @@ final class Factory {
 
                 // One service does both; it needs the embedding model too.
                 $both = new \Librarian\Ai\OpenAiCompatible($client, [
-                    'embed_model' => (string) $g['ai_embed_model']
+                    'embed_model'  => (string) $g['ai_embed_model'],
+                    'query_prefix' => (string) ($g['ai_embed_query_prefix'] ?? ''),
+                    'doc_prefix'   => (string) ($g['ai_embed_doc_prefix'] ?? '')
                 ] + \Librarian\Ai\ProviderConfig::forChat($g, $chat_key));
 
                 return ['embed' => $both, 'chat' => $both];

@@ -1939,6 +1939,10 @@ class ItemsMainView extends View {
             if (p[0].indexOf('search_query') !== 0) {
                 continue;
             }
+            // A search by meaning is a question in the person's own words; its words are not what was matched.
+            if (uri.searchParams.get(p[0].replace('search_query', 'search_type')) === 'meaning') {
+                continue;
+            }
             // Quoted phrases stay together; NOT words and -words are not highlighted.
             let skip = false;
             (p[1].match(/"[^"]*"|\S+/g) || []).forEach(function (t) {
@@ -1995,6 +1999,8 @@ class ItemsMainView extends View {
 
 views.itemsmain = new ItemsMainView();
 views.itemsfilter = new ItemsMainView();
+// The page of papers similar to one paper is an ordinary result list.
+views.semanticsimilar = new ItemsMainView();
 
 /**
  * Catalog.
@@ -2883,6 +2889,48 @@ class ItemdiscussionMainView extends View {
 }
 
 views.itemdiscussionmain = new ItemdiscussionMainView();
+
+/**
+ * Index the papers that are not searchable by meaning yet. Calls the server for one batch at a time and shows how far
+ * it has got; every message is written as text.
+ */
+function semanticBuild() {
+    let $link = $('#semantic-build'), $bar = $('#semantic-progress'), $status = $('#semantic-status'), total = null;
+    $link.addClass('d-none');
+    $bar.removeClass('d-none');
+    let step = function () {
+        $.ajax({url: window.IL_BASE_URL + 'index.php/semantic/build', type: 'POST', dataType: 'json', timeout: 300000}).done(function (r) {
+            let done = parseInt(r.done), pending = parseInt(r.pending);
+            if (total === null) {
+                total = done + pending;
+            }
+            let finished = total - pending;
+            $bar.find('.progress-bar').css('width', (total > 0 ? Math.round(100 * finished / total) : 100) + '%');
+            $status.text(finished + ' of ' + total + ' papers indexed.');
+            if (pending > 0 && done > 0) {
+                step();
+            } else {
+                $status.text(pending > 0 ? 'Stopped with ' + pending + ' papers left. Try again.' : 'Done. Search again to use the new index.');
+                $link.removeClass('d-none').text(pending > 0 ? 'Try again' : 'Index again');
+            }
+        }).fail(function (xhr) {
+            let msg = 'The index could not be built.';
+            try { msg = JSON.parse(xhr.responseText).error || msg; } catch (err) { /* keep the default */ }
+            $status.text(msg);
+            $link.removeClass('d-none').text('Try again');
+        });
+    };
+    step();
+}
+
+// Bound on body, in a ready callback that comes before the one near the end of this file: that one returns false for every
+// link whose href is '#', which would end the click before a handler on document saw it.
+$(function () {
+    $('body').on('click', '#semantic-build', function (e) {
+        e.preventDefault();
+        semanticBuild();
+    });
+});
 
 /**
  * POST a form and read a server-sent event stream from the answer. Each event is a JSON object on a "data: " line.

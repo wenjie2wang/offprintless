@@ -42,6 +42,8 @@ final class ProviderConfig {
             'api_key'        => $own ? $embed_key : $chat_key,
             'chat_model'     => '',
             'embed_model'    => (string) ($g['ai_embed_model'] ?? ''),
+            'query_prefix'   => (string) ($g['ai_embed_query_prefix'] ?? ''),
+            'doc_prefix'     => (string) ($g['ai_embed_doc_prefix'] ?? ''),
             'context_window' => (int) ($g['ai_context_window'] ?? 8000)
         ];
     }

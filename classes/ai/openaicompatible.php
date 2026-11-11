@@ -26,6 +26,8 @@ final class OpenAiCompatible implements EmbeddingProvider, ChatProvider {
     private string $chat_model;
     private int $window;
     private int $wait_ms;
+    private string $query_prefix;
+    private string $doc_prefix;
     private ?int $dims = null;
 
     /**
@@ -41,11 +43,35 @@ final class OpenAiCompatible implements EmbeddingProvider, ChatProvider {
         $this->chat_model = (string) ($o['chat_model'] ?? '');
         $this->window = (int) ($o['context_window'] ?? 8000);
         $this->wait_ms = (int) ($o['retry_wait_ms'] ?? 1000);
+        $this->query_prefix = self::prefix((string) ($o['query_prefix'] ?? ''));
+        $this->doc_prefix = self::prefix((string) ($o['doc_prefix'] ?? ''));
     }
 
+    /**
+     * A prefix as it is put before the text: the settings form trims what is typed, so the single space that follows
+     * "search_query:" is added here. A prefix that already ends in white space is kept as it is.
+     */
+    private static function prefix(string $p): string {
+
+        $p = ltrim($p);
+
+        return $p === '' ? '' : (preg_match('/\s$/', $p) === 1 ? $p : $p . ' ');
+    }
+
+    /**
+     * The id the vectors are kept under. The prefixes are part of it: vectors made with different prefixes are not
+     * comparable, so changing a prefix must start a new set rather than mix two.
+     */
     public function id(): string {
 
-        return 'openai:' . $this->embed_model;
+        $id = 'openai:' . $this->embed_model;
+
+        if ($this->query_prefix !== '' || $this->doc_prefix !== '') {
+
+            $id .= '+' . substr(md5($this->query_prefix . "\0" . $this->doc_prefix), 0, 6);
+        }
+
+        return $id;
     }
 
     public function dimensions(): int {
@@ -97,7 +123,15 @@ final class OpenAiCompatible implements EmbeddingProvider, ChatProvider {
 
         $out = [];
 
+        // Many embedding models rank better when a question and a passage are marked differently.
+        $prefix = $kind === 'query' ? $this->query_prefix : $this->doc_prefix;
+
         foreach (array_chunk(array_values($texts), self::BATCH) as $batch) {
+
+            if ($prefix !== '') {
+
+                $batch = array_map(fn($t) => $prefix . $t, $batch);
+            }
 
             $body = $this->post('embeddings', ['model' => $this->embed_model, 'input' => $batch]);
             $data = $body['data'] ?? null;
