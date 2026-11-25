@@ -1,9 +1,9 @@
 #!/bin/bash
 # Start php-fpm and Caddy; stop the container if either one dies, instead of
 # serving 502s forever (upstream start.sh never notices a php-fpm failure).
-SOCK=/run/php/php8.1-fpm.sock
+SOCK=/run/php/php8.5-fpm.sock
 
-/usr/sbin/php-fpm8.1 -F &
+/usr/sbin/php-fpm8.5 -F &
 PHP_PID=$!
 
 for _ in $(seq 1 30); do

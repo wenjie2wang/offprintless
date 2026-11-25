@@ -74,7 +74,7 @@ collaboration.
 - English only. The original's German translation file is still in the repository but is not kept up to date.
 
 ## What it needs
-PHP 8.1 with the extensions `sqlite3, gd, curl, intl, xml, json, mbstring, zip` (and `ldap` if you use LDAP), plus the
+PHP 8.1+ (8.5 in the Docker image) with the extensions `sqlite3, gd, curl, intl, xml, json, mbstring, zip` (and `ldap` if you use LDAP), plus the
 programs Poppler (`pdftotext`, `pdfinfo`, `pdftoppm`, `pdftohtml`) and Ghostscript. Tesseract OCR is optional. In Docker
 all of this is in the image.
 

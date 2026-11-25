@@ -1,5 +1,5 @@
 #!/bin/sh
-# Runs every access-model test inside a PHP 8.1 container with intl, mbstring, pdo_sqlite and poppler.
+# Runs every access-model test inside a PHP 8.5 container with intl, mbstring, pdo_sqlite and poppler.
 # Needs a one-time:  podman build -t il-phptest -f tests/Dockerfile.phptest tests
 cd "$(dirname "$0")/.." || exit 1
 # The hygiene test needs the list of tracked files, and the test container has no git.

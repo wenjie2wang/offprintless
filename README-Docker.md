@@ -27,6 +27,18 @@ docker build -t offprintless:5.11.3 -f Dockerfile.local .
 (`Dockerfile.local` also builds on ARM, for example an Apple Silicon Mac. The plain `Dockerfile` is the original's
 x86-64 version and can also be fed a release tarball as `docker build -t offprintless:5.11.3 - < package.tar.xz`.)
 
+The image is based on Ubuntu 26.04 with PHP 8.5 and Caddy 2.11. It installs Tesseract with English and Greek. For every
+OCR language (a larger image):
+
+```bash
+docker build --build-arg TESSERACT_ALL_LANGS=true -t offprintless:5.11.3 -f Dockerfile.local .
+```
+
+Behind a TLS-inspecting proxy, pass its root certificate with
+`--build-arg EXTRA_CA_PEM="$(cat corporate-certs.pem)"`.
+
+Rebuild now and then with `--pull` to pick up the newest Ubuntu security patches.
+
 ## Run container
 
 ```bash

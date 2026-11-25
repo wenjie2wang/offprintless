@@ -1,44 +1,48 @@
 # Local build of the CURRENT CHECKOUT (e.g. branch ww-project-access) on
-# Ubuntu 22.04 + PHP 8.1. Differences from ./Dockerfile:
+# Ubuntu 26.04 + PHP 8.5. Differences from ./Dockerfile:
 #   - Caddy is downloaded for the image's own CPU architecture (upstream is
 #     hardcoded to amd64 and fails with "exec format error" on arm64/Apple Silicon).
 #   - Uses start.local.sh, which exits if php-fpm or Caddy dies.
-FROM ubuntu:22.04
+FROM ubuntu:26.04
 
 LABEL org.opencontainers.image.title="Offprintless" \
       org.opencontainers.image.description="Self-hosted reference manager for PDFs and bibliographic metadata, with project-based access. A fork of I, Librarian Free." \
       org.opencontainers.image.version="5.11.3" \
       org.opencontainers.image.licenses="GPL-3.0-only" \
       org.opencontainers.image.source="https://github.com/wenjie2wang/offprintless" \
-      org.opencontainers.image.base.name="ubuntu:22.04"
+      org.opencontainers.image.base.name="ubuntu:26.04"
 
 ARG TIMEZONE="UTC"
-ARG CADDY_VERSION="2.10.2"
+ARG CADDY_VERSION="2.11.9"
+# Set to true for every Tesseract language (large). Default: English plus Greek, as upstream.
+ARG TESSERACT_ALL_LANGS=false
 
 # Optional: extra CA certificates to trust while building (needed behind a TLS-inspecting proxy such as Zscaler).
 # Pass with:  podman build --build-arg EXTRA_CA_PEM="$(cat corporate-certs.pem)" ...
 # Left empty (the default, e.g. on the server), it changes nothing.
 ARG EXTRA_CA_PEM=""
 
-RUN apt update && \
-    DEBIAN_FRONTEND=noninteractive apt install -qy ca-certificates && \
+RUN TESS_PKG="tesseract-ocr tesseract-ocr-ell"; \
+    if [ "$TESSERACT_ALL_LANGS" = "true" ]; then TESS_PKG="tesseract-ocr-all"; fi; \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -qy --no-install-recommends ca-certificates && \
     if [ -n "$EXTRA_CA_PEM" ]; then \
         printf '%s\n' "$EXTRA_CA_PEM" > /usr/local/share/ca-certificates/extra-ca.crt && update-ca-certificates; \
     fi && \
-    DEBIAN_FRONTEND=noninteractive TZ=${TIMEZONE} apt install -qy \
+    DEBIAN_FRONTEND=noninteractive TZ=${TIMEZONE} apt-get install -qy --no-install-recommends \
     wget tzdata php-fpm php-mbstring php-sqlite3 php-curl php-gd php-xml \
-    php-json php-zip php-intl php-ldap ghostscript \
-    poppler-utils tesseract-ocr && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+    php-zip php-intl php-ldap ghostscript \
+    poppler-utils $TESS_PKG && \
     ARCH="$(dpkg --print-architecture)" && \
     wget -q "https://github.com/caddyserver/caddy/releases/download/v${CADDY_VERSION}/caddy_${CADDY_VERSION}_linux_${ARCH}.tar.gz" && \
     tar xzf "caddy_${CADDY_VERSION}_linux_${ARCH}.tar.gz" caddy && \
     chown root:root caddy && mv caddy /usr/bin/caddy && \
-    rm "caddy_${CADDY_VERSION}_linux_${ARCH}.tar.gz" && \
     groupadd --system caddy && \
     useradd --system --gid caddy --create-home --home-dir /var/lib/caddy --shell /usr/sbin/nologin caddy && \
-    usermod -aG www-data caddy
+    usermod -aG www-data caddy && \
+    apt-get purge -y --auto-remove wget && \
+    apt-get clean && \
+    rm -rf caddy_*.tar.gz /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN mkdir -p /i-librarian /run/php /etc/caddy /var/log/caddy
 
