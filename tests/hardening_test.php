@@ -47,5 +47,20 @@ check('a successful sign-in resets the count', attempt($app, 'bob', 'pw-bob-1234
 echo "--- defaults ---\n";
 check('self-registered accounts are guests by default, not administrators', $app->di->getShared('AppSettings')->default_global_settings['default_permissions'], 'G');
 
+echo "--- password reset endpoint ---\n";
+// The form hides itself when reset is off; the send endpoint must refuse as well (GHSA-x3vq-xv74-4gmm).
+$rp = file_get_contents(__DIR__ . '/../app/controllers/resetpassword.php');
+preg_match('/function sendAction.*?resetPassword\(/s', $rp, $m);
+check('sendAction checks the reset_password setting before resetting', preg_match("/getIni\('reset_password', ?'reset_password'\) !== '1'.*?403.*?resetPassword\(/s", $m[0] ?? '') === 1, true);
+
+echo "--- error handler respects the error_reporting mask ---\n";
+$prev = error_reporting(E_ALL & ~E_DEPRECATED);
+$h = new \Librarian\Application($app->di);
+check('a masked deprecation is not turned into an exception', $h->errorHandler(E_DEPRECATED, 'x', __FILE__, 1), false);
+error_reporting(E_ALL);
+$thrown = false; try { $h->errorHandler(E_WARNING, 'x', __FILE__, 1); } catch (ErrorException $e) { $thrown = true; }
+check('an unmasked warning still throws', $thrown, true);
+error_reporting($prev);
+
 echo $fails === 0 ? "\nALL PASSED\n" : "\n$fails FAILED\n";
 exit($fails === 0 ? 0 : 1);
