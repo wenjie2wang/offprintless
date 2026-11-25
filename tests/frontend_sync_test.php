@@ -67,5 +67,10 @@ foreach (['src' => $src, 'min' => $min] as $label => $code) {
     check("the highlighter skips searches by meaning ($label)", preg_match('/search_type[^;]{0,200}meaning|meaning[^;]{0,200}search_type/s', $code) === 1 && str_contains($code, 'highlightSearch'), true);
 }
 
+// The IEEE record link must keep its closing quote after the id (it once broke the href).
+foreach (['src' => $src, 'min' => $min] as $label => $code) {
+    check("the IEEE record link is well formed ($label)", [str_contains($code, 'ieeexplore.ieee.org/document/"'), preg_match('~ieeexplore\.ieee\.org/document/\'\s*\+\s*xploreid\s*\+\s*\'" target~', $code)], [false, 1]);
+}
+
 echo $fails === 0 ? "\nALL PASSED\n" : "\n$fails FAILED\n";
 exit($fails === 0 ? 0 : 1);

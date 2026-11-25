@@ -4861,8 +4861,8 @@ class ImportUidView extends View {
                         $('#upload-form').find('.reload-button').removeClass('d-none');
                     } else {
                         let item = response.items[0];
-                        $('.import-wizard-uid').html('Record found:<h5><a href="https://ieeexplore.ieee.org/document/"' + xploreid
-                            + ' target="_blank">' + item.title + '</a></h5>');
+                        $('.import-wizard-uid').html('Record found:<h5><a href="https://ieeexplore.ieee.org/document/' + xploreid
+                            + '" target="_blank">' + item.title + '</a></h5>');
                         $('#metadata').val(JSON.stringify(item));
                         $('#fetch-record').addClass('d-none');
                         $('#upload-form').find(':submit, .reload-button').removeClass('d-none');

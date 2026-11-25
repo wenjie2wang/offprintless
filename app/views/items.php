@@ -842,7 +842,7 @@ EOT;
         $el->html('Go to last page');
 
         // Disabling.
-        if ((integer) $last_page === (integer) $get['page'] || (integer) $last_page === 0) {
+        if ((int) $last_page === (int) $get['page'] || (int) $last_page === 0) {
 
             $el->elementName('button');
             $el->removeAttr('href');
@@ -1227,19 +1227,19 @@ EOT;
 
             if ($screen >= 1600) {
 
-                $card_size = '3';
+                $card_size = '-3';
 
             } elseif ($screen >= 1366 && $screen < 1600) {
 
-                $card_size = '4';
+                $card_size = '-4';
 
             } elseif ($screen >= 768 && $screen < 1366) {
 
-                $card_size = '6';
+                $card_size = '-6';
 
             } else {
 
-                $card_size = '12';
+                $card_size = '-12';
             }
 
         } else {
@@ -1247,19 +1247,25 @@ EOT;
             switch ($this->app_settings->getUser('icons_per_row')) {
 
                 case 1:
-                    $card_size = '12';
+                    $card_size = '-12';
                     break;
                 case 2:
-                    $card_size = '6';
+                    $card_size = '-6';
                     break;
                 case 3:
-                    $card_size = '4';
+                    $card_size = '-4';
                     break;
                 case 4:
-                    $card_size = '3';
+                    $card_size = '-3';
+                    break;
+                case 6:
+                    $card_size = '-2';
+                    break;
+                case 12:
+                    $card_size = '';
                     break;
                 default:
-                    $card_size = '3';
+                    $card_size = '-3';
             }
         }
 
@@ -1375,7 +1381,7 @@ EOT
 
             $el = null;
 
-            $output .= "<div class=\"col-sm-{$card_size} pb-3\">$card</div>";
+            $output .= "<div class=\"col-sm{$card_size} pb-3\">$card</div>";
         }
 
         return $output;

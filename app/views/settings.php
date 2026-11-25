@@ -444,6 +444,44 @@ class SettingsView extends TextView {
 
         $el->type('radio');
         $el->inline(true);
+        $el->id('icons_per_row6');
+        $el->name('settings[icons_per_row]');
+        $el->value('6');
+        $el->label('6');
+
+        if ($user_settings['icons_per_row'] === '6') {
+
+            $el->checked('checked');
+        }
+
+        $radios_l .= $el->render();
+
+        $el = null;
+
+        /** @var Bootstrap\Input $el */
+        $el = $this->di->get('Input');
+
+        $el->type('radio');
+        $el->inline(true);
+        $el->id('icons_per_row12');
+        $el->name('settings[icons_per_row]');
+        $el->value('12');
+        $el->label('12');
+
+        if ($user_settings['icons_per_row'] === '12') {
+
+            $el->checked('checked');
+        }
+
+        $radios_l .= $el->render();
+
+        $el = null;
+
+        /** @var Bootstrap\Input $el */
+        $el = $this->di->get('Input');
+
+        $el->type('radio');
+        $el->inline(true);
         $el->id('icons_per_row5');
         $el->name('settings[icons_per_row]');
         $el->value('auto');
@@ -1558,6 +1596,44 @@ EOT;
         $el->label('4');
 
         if ($user_settings['icons_per_row'] === '4') {
+
+            $el->checked('checked');
+        }
+
+        $output .= $el->render();
+
+        $el = null;
+
+        /** @var Bootstrap\Input $el */
+        $el = $this->di->get('Input');
+
+        $el->type('radio');
+        $el->inline(true);
+        $el->id('icons_per_row6');
+        $el->name('settings[icons_per_row]');
+        $el->value('6');
+        $el->label('6');
+
+        if ($user_settings['icons_per_row'] === '6') {
+
+            $el->checked('checked');
+        }
+
+        $output .= $el->render();
+
+        $el = null;
+
+        /** @var Bootstrap\Input $el */
+        $el = $this->di->get('Input');
+
+        $el->type('radio');
+        $el->inline(true);
+        $el->id('icons_per_row12');
+        $el->name('settings[icons_per_row]');
+        $el->value('12');
+        $el->label('12');
+
+        if ($user_settings['icons_per_row'] === '12') {
 
             $el->checked('checked');
         }
